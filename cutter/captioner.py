@@ -107,6 +107,7 @@ Requirements:
   no # prefix. Do not pad with generic unrelated tags.
 - Both captions should feel native to short-form vertical video - not like a YouTube description.
 - Do not use em dashes (--) anywhere. Use hyphens (-) if a dash is needed.
+- Use singular first-person voice throughout (I, my, me). Never use we, our, or us.
 - Do not fabricate claims not supported by the metadata.
 
 Respond with valid JSON only, no markdown fences:
