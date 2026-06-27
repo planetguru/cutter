@@ -202,11 +202,17 @@
       padding: 2.5rem 0 3rem;
       margin-top: 4rem;
     }
-    footer p {
+    .foot-nav {
+      display: flex;
+      gap: 1.75rem;
+      flex-wrap: wrap;
+    }
+    .foot-nav a {
       font-size: 0.82rem;
       color: var(--muted);
-      margin: 0;
+      text-decoration: none;
     }
+    .foot-nav a:hover { color: var(--soft); }
   </style>
 </head>
 <body>
@@ -312,7 +318,13 @@
 
   <footer>
     <div class="wrap">
-      <p>Runs on macOS and Linux. Requires ffmpeg on PATH.</p>
+      <nav class="foot-nav">
+        <a href="/cutter/">Home</a>
+        <a href="/cutter/terms.html">Terms</a>
+        <a href="/cutter/privacy.html">Privacy</a>
+        <a href="https://github.com/planetguru/cutter">GitHub</a>
+        <a href="https://chris.uk.com">chris.uk.com</a>
+      </nav>
     </div>
   </footer>
 
