@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service — cutter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #08080f;
+      --surface:      #0e0e18;
+      --border:       #1c1c2a;
+      --accent:       #818cf8;
+      --accent-dim:   #4f46e5;
+      --text:         #dddde8;
+      --muted:        #50505e;
+      --soft:         #8888a0;
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 300;
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    nav {
+      padding: 2.25rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    nav .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mark {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .tag {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .hero {
+      padding: 4rem 0 3rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 3rem;
+    }
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: #ededf5;
+      margin-bottom: 0.75rem;
+    }
+    .hero p {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    h2 {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    p {
+      font-size: 0.95rem;
+      color: var(--soft);
+      margin-bottom: 0.9rem;
+      line-height: 1.8;
+    }
+    p:last-child { margin-bottom: 0; }
+
+    strong { color: var(--text); font-weight: 500; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0 3rem;
+      margin-top: 2rem;
+    }
+    footer p {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="wrap">
+      <a href="/cutter/" class="mark">cutter</a>
+      <span class="tag">private</span>
+    </div>
+  </nav>
+
+  <main>
+    <div class="wrap">
+
+      <div class="hero">
+        <h1>Terms of Service</h1>
+        <p>Last updated: June 2026</p>
+      </div>
+
+      <section>
+        <h2>About this tool</h2>
+        <p>Cutter is a personal automation tool that downloads YouTube videos, cuts them into short clips, and posts them to TikTok and Instagram. It is operated by <strong>Christopher Lacy-Hulbert</strong> for personal use.</p>
+        <p>This tool is not a public service and is not offered to third parties. Access to its functionality is restricted to the operator.</p>
+      </section>
+
+      <section>
+        <h2>Data collection and use</h2>
+        <p>Cutter does not collect, store, or process personal data belonging to any third party. It operates exclusively on content owned or controlled by the operator.</p>
+        <p>When connecting to TikTok or Instagram, the tool uses OAuth tokens to act on behalf of the operator's own accounts. These tokens are stored locally on the operator's machine and are not transmitted to any third-party service beyond the platform APIs themselves.</p>
+        <p>Video content processed by this tool originates from YouTube and is handled locally. No content is shared with, sold to, or accessible by anyone other than the operator.</p>
+      </section>
+
+      <section>
+        <h2>Platform API usage</h2>
+        <p>Cutter interacts with the TikTok Content Posting API and the Meta Graph API in accordance with each platform's developer terms. It does not scrape, automate user interactions, or access data beyond what is required to post content to the operator's own accounts.</p>
+        <p>Use of this tool is subject to the terms of service of any third-party platform it connects to, including TikTok and Instagram.</p>
+      </section>
+
+      <section>
+        <h2>Intellectual property</h2>
+        <p>The operator is responsible for ensuring that any content processed and posted using this tool complies with applicable copyright law and the terms of the source platform. This tool does not grant any rights to content it did not create.</p>
+      </section>
+
+      <section>
+        <h2>Limitation of liability</h2>
+        <p>This tool is provided as-is, for personal use only. The operator accepts no liability for any issues arising from its use, including but not limited to account suspension, content removal, or API changes by third-party platforms.</p>
+      </section>
+
+      <section>
+        <h2>Contact</h2>
+        <p>Questions regarding this tool or these terms can be directed to <a href="mailto:christo@zenitech.co.uk">christo@zenitech.co.uk</a>.</p>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p>Runs on macOS and Linux. Requires ffmpeg on PATH.</p>
+    </div>
+  </footer>
+
+</body>
+</html>
