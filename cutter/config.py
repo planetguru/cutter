@@ -9,7 +9,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Absolute path to the .env file, derived from this file's location so that
+# cron jobs running from arbitrary working directories still find it.
+ENV_PATH = Path(__file__).parent.parent / ".env"
+
+load_dotenv(ENV_PATH)
 
 
 class ConfigError(Exception):

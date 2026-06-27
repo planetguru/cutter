@@ -17,7 +17,7 @@ import requests
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from ..captioner import Caption
-from ..config import Settings, get_settings
+from ..config import ENV_PATH, Settings, get_settings
 from .base import PostResult
 
 CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -237,10 +237,9 @@ def run_oauth_flow(settings: Settings) -> None:
 
 
 def _update_env(key: str, value: str) -> None:
-    """Update or add a key in .env."""
-    env_path = Path(".env")
-    if env_path.exists():
-        lines = env_path.read_text().splitlines()
+    """Update or add a key in the project .env file."""
+    if ENV_PATH.exists():
+        lines = ENV_PATH.read_text().splitlines()
         updated = False
         for i, line in enumerate(lines):
             if line.startswith(f"{key}="):
@@ -249,7 +248,7 @@ def _update_env(key: str, value: str) -> None:
                 break
         if not updated:
             lines.append(f"{key}={value}")
-        env_path.write_text("\n".join(lines) + "\n")
+        ENV_PATH.write_text("\n".join(lines) + "\n")
     else:
-        env_path.write_text(f"{key}={value}\n")
+        ENV_PATH.write_text(f"{key}={value}\n")
     os.environ[key] = value

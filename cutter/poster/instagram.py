@@ -16,7 +16,7 @@ import requests
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from ..captioner import Caption
-from ..config import Settings
+from ..config import ENV_PATH, Settings
 from .base import PostResult
 from .tiktok import _update_env
 
