@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — cutter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #08080f;
+      --surface:      #0e0e18;
+      --border:       #1c1c2a;
+      --accent:       #818cf8;
+      --accent-dim:   #4f46e5;
+      --text:         #dddde8;
+      --muted:        #50505e;
+      --soft:         #8888a0;
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 300;
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    nav {
+      padding: 2.25rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    nav .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mark {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .tag {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .hero {
+      padding: 4rem 0 3rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 3rem;
+    }
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: #ededf5;
+      margin-bottom: 0.75rem;
+    }
+    .hero p {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    h2 {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    p {
+      font-size: 0.95rem;
+      color: var(--soft);
+      margin-bottom: 0.9rem;
+      line-height: 1.8;
+    }
+    p:last-child { margin-bottom: 0; }
+
+    strong { color: var(--text); font-weight: 500; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0 3rem;
+      margin-top: 2rem;
+    }
+    footer p {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="wrap">
+      <a href="/cutter/" class="mark">cutter</a>
+      <span class="tag">private</span>
+    </div>
+  </nav>
+
+  <main>
+    <div class="wrap">
+
+      <div class="hero">
+        <h1>Privacy Policy</h1>
+        <p>Last updated: June 2026</p>
+      </div>
+
+      <section>
+        <h2>Who operates this tool</h2>
+        <p>Cutter is a personal automation tool operated solely by <strong>Christopher Lacy-Hulbert</strong>. It is not a public service and is not made available to any third party.</p>
+      </section>
+
+      <section>
+        <h2>What data this tool handles</h2>
+        <p>Cutter processes video content and metadata fetched from YouTube. This includes video titles, descriptions, tags, and public comments. None of this data originates from, or is associated with, any user of this tool other than the operator.</p>
+        <p>Captions and hashtags are generated using the Anthropic API. The video metadata is sent to Anthropic's API as part of this process and is subject to <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic's privacy policy</a>.</p>
+        <p>No personal data belonging to any third party is collected, stored, or processed by this tool.</p>
+      </section>
+
+      <section>
+        <h2>Platform connections</h2>
+        <p>Cutter connects to TikTok and Instagram on behalf of the operator using OAuth tokens tied to the operator's own accounts. These tokens are stored locally on the operator's machine. No account credentials or tokens are shared with, or accessible to, any third party.</p>
+        <p>Content posted through this tool is published to the operator's own TikTok and Instagram accounts. The handling of that content once published is governed by each platform's own privacy policy.</p>
+      </section>
+
+      <section>
+        <h2>Data storage</h2>
+        <p>All data processed by this tool — including downloaded video files, generated captions, and OAuth tokens — is stored locally on the operator's machine. Nothing is persisted to a remote database or shared storage.</p>
+        <p>Video clips are temporarily hosted at <strong>chris.uk.com</strong> for preview purposes during the approval step, and are deleted automatically once a decision is made. They are not indexed, shared, or retained beyond that point.</p>
+      </section>
+
+      <section>
+        <h2>Third-party services</h2>
+        <p>This tool makes use of the following external services, each governed by their own privacy policies:</p>
+        <p><strong>YouTube / Google</strong> — source video and metadata. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>.</p>
+        <p><strong>Anthropic</strong> — caption generation via Claude Haiku. <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic Privacy Policy</a>.</p>
+        <p><strong>Twilio</strong> — WhatsApp message delivery for approval notifications. <a href="https://www.twilio.com/en-us/legal/privacy" target="_blank" rel="noopener">Twilio Privacy Policy</a>.</p>
+        <p><strong>TikTok</strong> — video publishing via the Content Posting API. <a href="https://www.tiktok.com/legal/page/global/privacy-policy" target="_blank" rel="noopener">TikTok Privacy Policy</a>.</p>
+        <p><strong>Meta / Instagram</strong> — video publishing via the Graph API. <a href="https://privacycenter.instagram.com/policy" target="_blank" rel="noopener">Instagram Privacy Policy</a>.</p>
+      </section>
+
+      <section>
+        <h2>Contact</h2>
+        <p>Any questions about this privacy policy can be directed to <a href="mailto:christo@zenitech.co.uk">christo@zenitech.co.uk</a>.</p>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p>Runs on macOS and Linux. Requires ffmpeg on PATH.</p>
+    </div>
+  </footer>
+
+</body>
+</html>
