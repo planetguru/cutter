@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cutter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #08080f;
+      --surface:      #0e0e18;
+      --border:       #1c1c2a;
+      --accent:       #818cf8;
+      --accent-dim:   #4f46e5;
+      --text:         #dddde8;
+      --muted:        #50505e;
+      --soft:         #8888a0;
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 300;
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    /* Nav */
+    nav {
+      padding: 2.25rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    nav .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mark {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+    .mark .cursor {
+      display: inline-block;
+      width: 0.55em;
+      height: 1.1em;
+      background: var(--accent);
+      vertical-align: text-bottom;
+      margin-left: 2px;
+      animation: blink 1.2s step-end infinite;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .tag {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 5.5rem 0 4rem;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5.5vw, 3.75rem);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      color: #ededf5;
+      margin-bottom: 1.6rem;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+    .hero .lead {
+      font-size: 1.1rem;
+      color: var(--soft);
+      max-width: 520px;
+      margin-bottom: 2.5rem;
+      line-height: 1.8;
+    }
+
+    /* Code blocks */
+    .cmd {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9rem 1.1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: #b0b0c8;
+      overflow-x: auto;
+      white-space: nowrap;
+      line-height: 1.5;
+    }
+    .cmd + .cmd { margin-top: 0.5rem; }
+    .p  { color: var(--muted); user-select: none; }
+    .kw { color: var(--accent); }
+    .fl { color: #7dd3fc; }
+    .val { color: #86efac; }
+    .cm { color: var(--muted); font-style: italic; }
+
+    /* Rule */
+    .rule {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 4rem 0;
+    }
+
+    /* Section heading */
+    h2 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    /* Body copy */
+    p {
+      font-size: 1rem;
+      color: var(--soft);
+      margin-bottom: 1.1rem;
+    }
+    p:last-child { margin-bottom: 0; }
+    strong { color: var(--text); font-weight: 500; }
+
+    /* Pipeline */
+    .pipeline { margin: 0; }
+    .step {
+      display: grid;
+      grid-template-columns: 3rem 1fr;
+      gap: 1.25rem;
+      padding: 1.25rem 0;
+      border-top: 1px solid var(--border);
+      align-items: start;
+    }
+    .step:last-child { border-bottom: 1px solid var(--border); }
+    .n {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--accent-dim);
+      padding-top: 0.2rem;
+      letter-spacing: 0.02em;
+    }
+    .step-body strong {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.3rem;
+      letter-spacing: -0.01em;
+    }
+    .step-body span {
+      font-size: 0.9rem;
+      color: var(--soft);
+      line-height: 1.6;
+    }
+
+    /* Install block */
+    .install {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .install .cmd {
+      background: var(--bg);
+      border-color: var(--border);
+    }
+    .install .cmd + .cmd { margin-top: 0.6rem; }
+    .install-note {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 1.25rem;
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0 3rem;
+      margin-top: 4rem;
+    }
+    footer p {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="wrap">
+      <span class="mark">cutter<span class="cursor"></span></span>
+      <span class="tag">private</span>
+    </div>
+  </nav>
+
+  <main>
+    <div class="wrap">
+
+      <section class="hero">
+        <h1>YouTube to TikTok<br>and Instagram,<br><em>with your approval.</em></h1>
+        <p class="lead">Give cutter a YouTube URL. It cuts the video into short vertical clips, writes platform-specific captions, sends each one to your WhatsApp for review, and posts the ones you approve.</p>
+        <div class="cmd">
+          <span class="p">$ </span><span class="kw">cutter run</span>
+          <span class="fl"> --url</span> <span class="val">"https://youtube.com/watch?v=..."</span>
+          <span class="fl"> --post</span> <span class="val">both</span>
+          <span class="fl"> --approve</span>
+        </div>
+      </section>
+
+      <hr class="rule">
+
+      <section style="margin-bottom: 4rem;">
+        <h2>Pipeline</h2>
+        <div class="pipeline">
+          <div class="step">
+            <span class="n">01</span>
+            <div class="step-body">
+              <strong>Download</strong>
+              <span>yt-dlp fetches the video and extracts the title, description, tags, and top comments. Cached after the first run.</span>
+            </div>
+          </div>
+          <div class="step">
+            <span class="n">02</span>
+            <div class="step-body">
+              <strong>Detect</strong>
+              <span>Two FFmpeg passes - one for scene changes, one for silence gaps. The results are merged into 25-55 second segments at the most natural cut points.</span>
+            </div>
+          </div>
+          <div class="step">
+            <span class="n">03</span>
+            <div class="step-body">
+              <strong>Reframe</strong>
+              <span>Each clip is reformatted to 9:16. The original content sits centred over a blurred, scaled-up version of itself as the background fill.</span>
+            </div>
+          </div>
+          <div class="step">
+            <span class="n">04</span>
+            <div class="step-body">
+              <strong>Caption</strong>
+              <span>Claude Haiku reads the video metadata and writes platform-specific captions with relevant hashtags for both TikTok and Instagram.</span>
+            </div>
+          </div>
+          <div class="step">
+            <span class="n">05</span>
+            <div class="step-body">
+              <strong>Approve</strong>
+              <span>Each clip is sent to your WhatsApp as a video. Reply <strong>yes</strong>, <strong>no</strong>, or <strong>no more today</strong>. Captions can be edited inline before anything gets posted.</span>
+            </div>
+          </div>
+          <div class="step">
+            <span class="n">06</span>
+            <div class="step-body">
+              <strong>Post</strong>
+              <span>Approved clips go to TikTok via the Content Posting API and to Instagram Reels via the Meta Graph API.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section style="margin-bottom: 4rem;">
+        <h2>Details</h2>
+        <p>Every stage writes its output to disk. Re-running the same URL resumes from wherever it left off - clips already cut, captioned, or posted are not repeated. A withheld clip stays withheld across runs.</p>
+        <p>The approval conversation runs over WhatsApp via Twilio, polling for replies every five seconds. Clips are temporarily hosted for preview and cleaned up automatically once a decision is made.</p>
+        <p>Posting credentials are loaded from <strong>.env</strong> and validated only when the platform is actually in use. TikTok tokens refresh automatically on expiry. Instagram requires an S3 bucket for staging uploads before the Meta Graph API can ingest them.</p>
+      </section>
+
+      <section style="margin-bottom: 4rem;">
+        <h2>Commands</h2>
+        <div class="cmd"><span class="p">$ </span><span class="kw">cutter run</span> <span class="fl">--url</span> <span class="val">URL</span> <span class="fl">--post</span> <span class="val">both</span> <span class="fl">--approve</span></div>
+        <div class="cmd"><span class="p">$ </span><span class="kw">cutter detect</span> <span class="fl">--url</span> <span class="val">URL</span> <span class="cm">  # preview cut points only</span></div>
+        <div class="cmd"><span class="p">$ </span><span class="kw">cutter withheld</span> <span class="cm">               # list withheld clips</span></div>
+        <div class="cmd"><span class="p">$ </span><span class="kw">cutter auth</span> <span class="val">tiktok</span></div>
+        <div class="cmd"><span class="p">$ </span><span class="kw">cutter auth</span> <span class="val">instagram</span> <span class="fl">--refresh</span></div>
+      </section>
+
+      <section>
+        <h2>Install</h2>
+        <div class="install">
+          <div class="cmd"><span class="p">$ </span><span class="val">python3 -m venv .venv &amp;&amp; source .venv/bin/activate</span></div>
+          <div class="cmd"><span class="p">$ </span><span class="kw">pip install</span> <span class="fl">-e</span> <span class="val">.</span></div>
+          <p class="install-note">Requires Python 3.11 or later and ffmpeg on PATH. Copy <strong>.env.example</strong> to <strong>.env</strong> and fill in your credentials before running.</p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p>Runs on macOS and Linux. Requires ffmpeg on PATH.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

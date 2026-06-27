@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cutter"
+version = "0.1.0"
+description = "Download YouTube videos and cut them into TikTok/Instagram Reels"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1",
+    "python-dotenv>=1.0",
+    "yt-dlp>=2024.11.4",
+    "anthropic>=0.34",
+    "requests>=2.32",
+    "tenacity>=8.5",
+    "rich>=13.7",
+    "platformdirs>=4.2",
+    "boto3>=1.35",
+    "twilio>=9.3",
+]
+
+[project.scripts]
+cutter = "cutter.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cutter"]

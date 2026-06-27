@@ -1,0 +1,1 @@
+"""Platform poster modules."""
