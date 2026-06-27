@@ -25,7 +25,7 @@ class WhatsAppClient:
         self._from = settings.twilio_whatsapp_from
         self._to = settings.twilio_whatsapp_to
 
-    def send(self, body: str, media_url: str | None = None) -> datetime:
+    def send(self, body: str = "", media_url: str | None = None) -> datetime:
         """Send a WhatsApp message (optionally with a media attachment)."""
         kwargs: dict = {"from_": self._from, "to": self._to, "body": body}
         if media_url:

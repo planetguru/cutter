@@ -59,10 +59,11 @@ def approve_clip(
 
     try:
         for reprompt in range(MAX_REPROMPTS):
-            sent_at = wa.send(
-                _build_prompt(clip_path, current, clip_index, total_clips),
-                media_url=video_url,
-            )
+            # Video and text must be separate messages — WhatsApp drops the body
+            # when a video media_url is present.
+            if video_url and reprompt == 0:
+                wa.send(media_url=video_url)
+            sent_at = wa.send(_build_prompt(clip_path, current, clip_index, total_clips))
             reply = wa.wait_for_reply(after=sent_at, timeout_secs=REPLY_TIMEOUT_SECS)
 
             if reply is None:
