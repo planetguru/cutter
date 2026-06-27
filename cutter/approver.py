@@ -10,13 +10,8 @@ from enum import Enum, auto
 from pathlib import Path
 
 from .captioner import Caption
+from .config import Settings
 from .whatsapp import WhatsAppClient
-
-SERVER_HOST = "chris.uk.com"
-SERVER_USER = "root"
-SERVER_WEBROOT = "/var/www/cutter/media"
-SERVER_BASE_URL = "https://chris.uk.com/cutter/media"
-SSH_KEY = str(Path.home() / ".ssh" / "id_ed25519")
 
 
 class Decision(Enum):
@@ -42,6 +37,7 @@ def approve_clip(
     caption: Caption,
     clip_index: int,
     total_clips: int,
+    settings: Settings | None = None,
 ) -> ApprovalResult:
     """
     Run the WhatsApp approval conversation for one clip.
@@ -54,8 +50,8 @@ def approve_clip(
         hashtags=list(caption.hashtags),
     )
 
-    remote_name = _upload_to_server(clip_path)
-    video_url = f"{SERVER_BASE_URL}/{remote_name}" if remote_name else None
+    remote_name = _upload_to_server(clip_path, settings) if settings and settings.preview_host else None
+    video_url = f"{settings.preview_base_url}/{remote_name}" if remote_name else None
 
     try:
         for reprompt in range(MAX_REPROMPTS):
@@ -79,8 +75,8 @@ def approve_clip(
         wa.send(f"⚠️ No response after {MAX_REPROMPTS} prompts. Skipping clip {clip_index}/{total_clips} for now.")
         return ApprovalResult(decision=Decision.TIMEOUT, caption=current)
     finally:
-        if remote_name:
-            _delete_from_server(remote_name)
+        if remote_name and settings:
+            _delete_from_server(remote_name, settings)
 
 
 def _handle_reply(
@@ -198,12 +194,14 @@ def _build_edit_ack(field_name: str, new_value: str, clip_index: int, total_clip
 
 
 
-def _upload_to_server(clip_path: Path) -> str | None:
+def _upload_to_server(clip_path: Path, settings: Settings) -> str | None:
     """
-    Compress clip to 540x960 and SCP to chris.uk.com/cutter/.
+    Compress clip to 540x960 and SCP to the configured preview server.
     Returns the remote filename (not full URL), or None on failure.
     """
     remote_name = f"{clip_path.stem}_preview.mp4"
+    ssh_key = str(Path(settings.preview_ssh_key).expanduser())
+    dest = f"{settings.preview_user}@{settings.preview_host}:{settings.preview_webroot}/{remote_name}"
 
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
         preview_path = Path(tmp.name)
@@ -231,14 +229,8 @@ def _upload_to_server(clip_path: Path) -> str | None:
             return None
 
         scp_result = subprocess.run(
-            [
-                "scp",
-                "-i", SSH_KEY,
-                "-o", "StrictHostKeyChecking=no",
-                "-o", "BatchMode=yes",
-                str(preview_path),
-                f"{SERVER_USER}@{SERVER_HOST}:{SERVER_WEBROOT}/{remote_name}",
-            ],
+            ["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
+             str(preview_path), dest],
             capture_output=True,
             timeout=120,
         )
@@ -246,15 +238,15 @@ def _upload_to_server(clip_path: Path) -> str | None:
             print(f"[approver] scp failed: {scp_result.stderr.decode().strip()}")
             return None
 
-        # Caddy runs as 'caddy' user; make the file world-readable.
+        # Ensure the file is world-readable (web server may run as non-root).
         subprocess.run(
-            ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
-             f"{SERVER_USER}@{SERVER_HOST}",
-             f"chmod 644 {SERVER_WEBROOT}/{remote_name}"],
+            ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
+             f"{settings.preview_user}@{settings.preview_host}",
+             f"chmod 644 {settings.preview_webroot}/{remote_name}"],
             capture_output=True, timeout=15,
         )
 
-        print(f"[approver] uploaded preview: {SERVER_BASE_URL}/{remote_name}")
+        print(f"[approver] uploaded preview: {settings.preview_base_url}/{remote_name}")
         return remote_name
 
     except Exception as e:
@@ -264,18 +256,14 @@ def _upload_to_server(clip_path: Path) -> str | None:
         preview_path.unlink(missing_ok=True)
 
 
-def _delete_from_server(remote_name: str) -> None:
-    """Delete a preview clip from chris.uk.com after approval decision."""
+def _delete_from_server(remote_name: str, settings: Settings) -> None:
+    """Delete a preview clip from the preview server after approval decision."""
+    ssh_key = str(Path(settings.preview_ssh_key).expanduser())
     try:
         subprocess.run(
-            [
-                "ssh",
-                "-i", SSH_KEY,
-                "-o", "StrictHostKeyChecking=no",
-                "-o", "BatchMode=yes",
-                f"{SERVER_USER}@{SERVER_HOST}",
-                f"rm -f {SERVER_WEBROOT}/{remote_name}",
-            ],
+            ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
+             f"{settings.preview_user}@{settings.preview_host}",
+             f"rm -f {settings.preview_webroot}/{remote_name}"],
             capture_output=True,
             timeout=15,
         )

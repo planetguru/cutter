@@ -128,7 +128,7 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
 
         # --- Approval gate ---
         if options.approve and wa is not None and cap is not None:
-            result = approve_clip(wa, clip_path, cap, i, total)
+            result = approve_clip(wa, clip_path, cap, i, total, settings)
             cap = result.caption  # may have been edited
 
             if result.decision == Decision.WITHHELD:

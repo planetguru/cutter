@@ -44,6 +44,15 @@ class Settings:
     twilio_whatsapp_from: str = field(default_factory=lambda: os.getenv("TWILIO_WHATSAPP_FROM", ""))
     twilio_whatsapp_to: str = field(default_factory=lambda: os.getenv("TWILIO_WHATSAPP_TO", ""))
 
+    # Preview server (WhatsApp approval clip hosting)
+    preview_host: str = field(default_factory=lambda: os.getenv("PREVIEW_HOST", ""))
+    preview_user: str = field(default_factory=lambda: os.getenv("PREVIEW_USER", "root"))
+    preview_webroot: str = field(default_factory=lambda: os.getenv("PREVIEW_WEBROOT", ""))
+    preview_base_url: str = field(default_factory=lambda: os.getenv("PREVIEW_BASE_URL", ""))
+    preview_ssh_key: str = field(
+        default_factory=lambda: os.getenv("PREVIEW_SSH_KEY") or str(Path.home() / ".ssh" / "id_ed25519")
+    )
+
     # S3 (Instagram video staging — only needed when posting to Instagram)
     aws_access_key_id: str = field(default_factory=lambda: os.getenv("AWS_ACCESS_KEY_ID", ""))
     aws_secret_access_key: str = field(default_factory=lambda: os.getenv("AWS_SECRET_ACCESS_KEY", ""))
