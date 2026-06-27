@@ -177,9 +177,9 @@ def _build_prompt(
 
     return (
         f"📹 *Clip {clip_index}/{total_clips}* — {clip_path.name}\n\n"
-        f"*TikTok caption:*\n{caption.tiktok_caption[:300]}\n\n"
-        f"*Instagram caption:*\n{caption.instagram_caption[:300]}\n\n"
-        f"*Hashtags:* {hashtag_preview}\n\n"
+        f"*TikTok caption:*\n{caption.tiktok_caption}\n\n"
+        f"*Instagram caption:*\n{caption.instagram_caption}\n\n"
+        f"*Hashtags:* {caption.hashtag_string}\n\n"
         "Reply:\n"
         "  *yes* — post this clip\n"
         "  *no* — skip (move to withheld)\n"
