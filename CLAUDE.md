@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Setup (new machine)
+
+```bash
+git clone https://github.com/planetguru/cutter
+cd cutter
+bash setup.sh   # creates venv, installs deps, adds daily cron job at 9am
+```
+
+Then fill in `.env` and run the auth commands below.
+
 ## Commands
 
 ```bash
@@ -9,11 +19,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 
-# Full pipeline with WhatsApp approval before each post
-cutter run --url "https://www.youtube.com/watch?v=..." --post both --approve
+# Daily cron entrypoint — reads queue, processes next pending video, posts to all platforms
+cutter daily
+cutter daily --no-approve   # skip WhatsApp approval, post automatically
 
-# Full pipeline, post automatically without approval
-cutter run --url "https://www.youtube.com/watch?v=..." --post both
+# Manage the video queue
+cutter queue add "https://www.youtube.com/watch?v=..."
+cutter queue list
+
+# Queue a video via WhatsApp by sending:
+#   queue:https://www.youtube.com/watch?v=...
+# cutter daily picks these up automatically on the next run.
+
+# One-off pipeline (bypasses the queue)
+cutter run --url "https://www.youtube.com/watch?v=..." --post all --approve
+cutter run --url "https://www.youtube.com/watch?v=..." --post all
+cutter run --url "https://www.youtube.com/watch?v=..." --post both   # TikTok + Instagram
+cutter run --url "https://www.youtube.com/watch?v=..." --post youtube
 
 # Preview cut points only (no clips generated)
 cutter detect --url "https://www.youtube.com/watch?v=..."
@@ -28,6 +50,7 @@ cutter withheld
 cutter auth tiktok
 cutter auth instagram
 cutter auth instagram --refresh   # refresh 60-day token before expiry
+cutter auth youtube               # shows channel name so you can confirm the right one
 ```
 
 ## Architecture
@@ -42,7 +65,7 @@ YouTube URL
   → reframer.py     →  reframed/clip_NNN.mp4         (FFmpeg re-encode, 9:16 blurred background)
   → captioner.py    →  captions.json                 (Claude Haiku)
   → approver.py     →  WhatsApp conversation per clip (if --approve)
-  → poster/         →  TikTok / Instagram post
+  → poster/         →  TikTok / Instagram / YouTube Shorts post
 ```
 
 `pipeline.py` is the orchestrator — single entry point wiring all stages. The CLI in `cli.py` is a thin Click wrapper over `pipeline.run()`.

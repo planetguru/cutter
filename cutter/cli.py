@@ -26,7 +26,7 @@ def main() -> None:
 
 @main.command()
 @click.option("--url", required=True, help="YouTube video URL")
-@click.option("--post", default="none", type=click.Choice(["tiktok", "instagram", "both", "none"]), show_default=True)
+@click.option("--post", default="none", type=click.Choice(["tiktok", "instagram", "youtube", "both", "all", "none"]), show_default=True, help="Platform(s) to post to: tiktok, instagram, youtube, both (tiktok+instagram), all (all three), or none")
 @click.option("--approve/--no-approve", default=False, help="Ask for WhatsApp approval before each post")
 @click.option("--min-clip", default=25, show_default=True, help="Minimum clip length in seconds")
 @click.option("--max-clip", default=55, show_default=True, help="Maximum clip length in seconds")
@@ -87,6 +87,7 @@ def run_cmd(
     table.add_column("Status")
     table.add_column("TikTok")
     table.add_column("Instagram")
+    table.add_column("YouTube")
 
     for i, r in enumerate(results, 1):
         if r.withheld:
@@ -98,7 +99,8 @@ def run_cmd(
 
         tiktok_col = _post_status(r.post_results, "tiktok")
         instagram_col = _post_status(r.post_results, "instagram")
-        table.add_row(str(i), r.clip_path.name, status, tiktok_col, instagram_col)
+        youtube_col = _post_status(r.post_results, "youtube")
+        table.add_row(str(i), r.clip_path.name, status, tiktok_col, instagram_col, youtube_col)
 
     console.print(table)
 
@@ -260,3 +262,150 @@ def instagram(refresh: bool) -> None:
     except InstagramError as e:
         console.print(f"[red]Instagram auth error:[/red] {e}")
         raise SystemExit(1)
+
+
+@auth.command()
+def youtube() -> None:
+    """Run YouTube OAuth flow and save tokens to .env."""
+    from .poster.youtube import YouTubeError, run_oauth_flow
+
+    settings = get_settings()
+    try:
+        run_oauth_flow(settings)
+    except YouTubeError as e:
+        console.print(f"[red]YouTube auth error:[/red] {e}")
+        raise SystemExit(1)
+
+
+# ---------------------------------------------------------------------------
+# cutter queue
+# ---------------------------------------------------------------------------
+
+@main.group()
+def queue() -> None:
+    """Manage the video URL queue."""
+
+
+@queue.command(name="add")
+@click.argument("url")
+def queue_add(url: str) -> None:
+    """Add a YouTube URL to the processing queue."""
+    from . import queue as q
+
+    if q.add(url):
+        console.print(f"[green]Queued:[/green] {url}")
+    else:
+        console.print(f"[yellow]Already in queue:[/yellow] {url}")
+
+
+@queue.command(name="list")
+def queue_list() -> None:
+    """Show all queued videos and their status."""
+    from . import queue as q
+
+    items = q.list_all()
+    if not items:
+        console.print("[dim]Queue is empty. Add a URL with: cutter queue add <url>[/dim]")
+        return
+
+    table = Table(title="Video queue")
+    table.add_column("Status")
+    table.add_column("URL")
+    table.add_column("Added")
+    table.add_column("Used")
+
+    for item in items:
+        if item.status == "pending":
+            status = "[green]pending[/green]"
+        else:
+            status = "[dim]used[/dim]"
+        added = item.added[:10]
+        used = item.used[:10] if item.used else "—"
+        table.add_row(status, item.url, added, used)
+
+    console.print(table)
+
+    pending = sum(1 for i in items if i.status == "pending")
+    console.print(f"\n[green]{pending} pending[/green]  [dim]{len(items) - pending} used[/dim]")
+
+
+# ---------------------------------------------------------------------------
+# cutter daily
+# ---------------------------------------------------------------------------
+
+@main.command()
+@click.option("--post", default="all",
+              type=click.Choice(["tiktok", "instagram", "youtube", "both", "all", "none"]),
+              show_default=True)
+@click.option("--approve/--no-approve", default=True,
+              help="Ask for WhatsApp approval before posting (default: on)")
+def daily(post: str, approve: bool) -> None:
+    """Process the next queued video. Designed to run from cron once a day."""
+    import re
+
+    from . import queue as q
+    from .config import check_ffmpeg
+    from .state import StateStore
+
+    try:
+        check_ffmpeg()
+    except ConfigError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise SystemExit(1)
+
+    settings = get_settings()
+    workdir = Path(platformdirs.user_data_dir("cutter"))
+
+    # Check WhatsApp for queue: messages (best-effort)
+    try:
+        from .whatsapp import WhatsAppClient
+        wa = WhatsAppClient(settings)
+        since = q.get_last_whatsapp_scan()
+        new_urls = wa.scan_queue_messages(since=since)
+        q.update_last_whatsapp_scan()
+        for url in new_urls:
+            if q.add(url):
+                console.print(f"[dim]Queued from WhatsApp: {url}[/dim]")
+    except Exception:
+        pass
+
+    url = q.next_pending()
+    if url is None:
+        console.print("[dim]Queue is empty — nothing to post today.[/dim]")
+        return
+
+    console.print(f"Processing: {url}")
+
+    options = PipelineOptions(
+        post=post,
+        approve=approve,
+        workdir=workdir,
+    )
+
+    try:
+        results = run(url, options)
+    except ConfigError as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        raise SystemExit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise SystemExit(1)
+
+    # Mark URL as used once all its clips are processed.
+    # Leave as pending if the user said "no more today" (clips remain in pending state).
+    has_skipped = any(r.skipped_today for r in results)
+    if not has_skipped:
+        # Confirm no pending clips remain for this video (guards against the
+        # "paused today from a previous run" case which returns an empty result list).
+        m = re.search(r'(?:v=|youtu\.be/|embed/|shorts/)([a-zA-Z0-9_-]{11})', url)
+        video_id = m.group(1) if m else None
+        if video_id:
+            store = StateStore(workdir)
+            vs = store.state.videos.get(video_id)
+            still_pending = vs.pending if vs else []
+        else:
+            still_pending = []
+
+        if not still_pending:
+            q.mark_used(url)
+            console.print(f"[dim]Marked as used: {url}[/dim]")

@@ -59,6 +59,13 @@ class Settings:
     aws_s3_bucket: str = field(default_factory=lambda: os.getenv("AWS_S3_BUCKET", ""))
     aws_s3_region: str = field(default_factory=lambda: os.getenv("AWS_S3_REGION", "us-east-1"))
 
+    # YouTube
+    youtube_client_id: str = field(default_factory=lambda: os.getenv("YOUTUBE_CLIENT_ID", ""))
+    youtube_client_secret: str = field(default_factory=lambda: os.getenv("YOUTUBE_CLIENT_SECRET", ""))
+    youtube_access_token: str = field(default_factory=lambda: os.getenv("YOUTUBE_ACCESS_TOKEN", ""))
+    youtube_refresh_token: str = field(default_factory=lambda: os.getenv("YOUTUBE_REFRESH_TOKEN", ""))
+    youtube_channel_id: str = field(default_factory=lambda: os.getenv("YOUTUBE_CHANNEL_ID", ""))
+
     def require_anthropic(self) -> None:
         if not self.anthropic_api_key:
             raise ConfigError("ANTHROPIC_API_KEY is not set. Add it to .env to enable caption generation.")
@@ -89,6 +96,16 @@ class Settings:
         if s3_missing:
             raise ConfigError(
                 f"S3 credentials missing: {', '.join(s3_missing).upper()}. Required for Instagram video upload."
+            )
+
+    def require_youtube(self) -> None:
+        missing = [
+            k for k in ("youtube_client_id", "youtube_client_secret", "youtube_access_token", "youtube_refresh_token")
+            if not getattr(self, k)
+        ]
+        if missing:
+            raise ConfigError(
+                f"YouTube credentials missing: {', '.join(missing).upper()}. Run: cutter auth youtube"
             )
 
 

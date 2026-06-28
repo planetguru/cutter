@@ -76,6 +76,41 @@ class WhatsAppClient:
 
         return None
 
+    def scan_queue_messages(self, since: datetime | None = None) -> list[str]:
+        """Return YouTube URLs from 'queue:...' messages received since `since`.
+
+        Used by `cutter daily` to let users queue videos via WhatsApp.
+        """
+        from datetime import timedelta
+        if since is None:
+            since = datetime.now(timezone.utc) - timedelta(days=7)
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=timezone.utc)
+
+        try:
+            messages = self._client.messages.list(limit=100)
+        except Exception:
+            return []
+
+        urls: list[str] = []
+        for msg in messages:
+            sent_at = msg.date_created
+            if sent_at and sent_at.tzinfo is None:
+                sent_at = sent_at.replace(tzinfo=timezone.utc)
+
+            is_from_user = (msg.from_ or "").replace(" ", "") == self._to.replace(" ", "")
+            is_recent = sent_at is not None and sent_at > since
+            is_inbound = msg.direction == "inbound"
+
+            if is_from_user and is_recent and is_inbound:
+                body = (msg.body or "").strip()
+                if body.lower().startswith("queue:"):
+                    url = body[6:].strip()
+                    if url:
+                        urls.append(url)
+
+        return urls
+
 
 def _require_whatsapp(settings: Settings) -> None:
     missing = [

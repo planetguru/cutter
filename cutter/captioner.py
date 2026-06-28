@@ -98,14 +98,16 @@ def _build_prompt(asset: VideoAsset, clip_index: int, total_clips: int) -> str:
 Generate captions and hashtags for this clip suitable for both TikTok and Instagram Reels.
 
 Requirements:
-- TikTok caption: max 2,200 characters. The FIRST LINE is critical — it must be a compelling hook
-  that stops the scroll (a question, a bold claim, or a surprising statement). Keep it conversational.
-  End with a call-to-action (follow, comment, share).
-- Instagram caption: max 2,200 characters. First line still needs to hook (Instagram truncates after
-  ~125 chars before "more"). Slightly more polished than TikTok. Use paragraph breaks for readability.
+- TikTok caption: max 2,200 characters. First line should describe what the clip is actually about
+  in plain language — specific enough to be interesting, not vague. No hype, no dramatic rhetoric.
+- Instagram caption: max 2,200 characters. Same tone as TikTok. Use paragraph breaks for readability.
+  Instagram truncates to ~125 chars before "more", so make the first sentence count.
 - Hashtags: 10-15 tags, mix of broad (#fyp, #reels) and niche tags tightly relevant to the content,
   no # prefix. Do not pad with generic unrelated tags.
-- Both captions should feel native to short-form vertical video - not like a YouTube description.
+- Write in a plain, direct, first-person voice. Describe what is actually happening.
+- Avoid: hype words (obsessed, stunning, raw as an aesthetic, vibe, energy, game-changer, just clicks,
+  mind-blowing), dramatic ellipses, lists of three things for effect, vague aesthetic labels.
+- Do not add calls to action (follow, like, subscribe, comment).
 - Do not use em dashes (--) anywhere. Use hyphens (-) if a dash is needed.
 - Use singular first-person voice throughout (I, my, me). Never use we, our, or us.
 - Do not fabricate claims not supported by the metadata.

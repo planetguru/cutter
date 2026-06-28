@@ -25,7 +25,7 @@ class PipelineOptions:
     max_clip_secs: float = 55.0
     scene_threshold: float = 12.0
     silence_db: float = -40.0
-    post: str = "none"          # "tiktok" | "instagram" | "both" | "none"
+    post: str = "none"          # "tiktok" | "instagram" | "youtube" | "both" | "all" | "none"
     approve: bool = False       # require WhatsApp approval before posting
     captions: bool = True
     keep_raw: bool = False
@@ -52,10 +52,12 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
     settings = get_settings()
 
     # Validate posting credentials early
-    if options.post in ("tiktok", "both"):
+    if options.post in ("tiktok", "both", "all"):
         settings.require_tiktok()
-    if options.post in ("instagram", "both"):
+    if options.post in ("instagram", "both", "all"):
         settings.require_instagram()
+    if options.post in ("youtube", "all"):
+        settings.require_youtube()
     if options.captions:
         settings.require_anthropic()
 
@@ -153,14 +155,19 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
         # --- Post ---
         clip_result = ClipResult(clip_path=clip_path, caption=cap)
 
-        if options.post in ("tiktok", "both"):
+        if options.post in ("tiktok", "both", "all"):
             from .poster.tiktok import TikTokPoster
             post_result = TikTokPoster(settings).post(clip_path, cap)
             clip_result.post_results.append(post_result)
 
-        if options.post in ("instagram", "both"):
+        if options.post in ("instagram", "both", "all"):
             from .poster.instagram import InstagramPoster
             post_result = InstagramPoster(settings).post(clip_path, cap)
+            clip_result.post_results.append(post_result)
+
+        if options.post in ("youtube", "all"):
+            from .poster.youtube import YouTubePoster
+            post_result = YouTubePoster(settings).post(clip_path, cap)
             clip_result.post_results.append(post_result)
 
         # Only mark posted when something was actually sent to a platform
