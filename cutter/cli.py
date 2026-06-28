@@ -21,6 +21,56 @@ def main() -> None:
 
 
 # ---------------------------------------------------------------------------
+# cutter reset
+# ---------------------------------------------------------------------------
+
+@main.command()
+def reset() -> None:
+    """Kill any running cutter processes and clear all queues and state."""
+    import json
+    import os
+    import signal
+    import subprocess
+
+    # Kill any other cutter processes (daily runs, pipelines, etc.)
+    killed = 0
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "cutter"],
+            capture_output=True, text=True,
+        )
+        my_pid = os.getpid()
+        for pid_str in result.stdout.splitlines():
+            pid = int(pid_str.strip())
+            if pid != my_pid:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    killed += 1
+                except ProcessLookupError:
+                    pass
+    except Exception:
+        pass
+
+    if killed:
+        console.print(f"[yellow]Killed {killed} running process(es).[/yellow]")
+    else:
+        console.print("[dim]No running cutter processes found.[/dim]")
+
+    workdir = Path(platformdirs.user_data_dir("cutter"))
+
+    # Clear URL queue
+    queue_path = workdir / "queue.json"
+    queue_path.write_text(json.dumps({"last_whatsapp_scan": None, "items": []}, indent=2))
+
+    # Clear approval state
+    state_path = workdir / "approval_state.json"
+    state_path.write_text(json.dumps({"no_more_until": None, "videos": {}}, indent=2))
+
+    console.print("[green]Queue and approval state cleared.[/green]")
+    console.print("[dim]Ready for a fresh run.[/dim]")
+
+
+# ---------------------------------------------------------------------------
 # cutter run
 # ---------------------------------------------------------------------------
 
