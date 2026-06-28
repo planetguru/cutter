@@ -107,6 +107,14 @@ When a clip is ready, cutter sends two messages: a video preview, then a text pr
 
 After making edits, the updated preview is shown again for confirmation.
 
+## Resetting everything
+
+```bash
+cutter reset
+```
+
+Kills any in-flight processes, clears the queue, wipes approval state, and deletes all downloaded videos, clips, and captions. Use this to start completely fresh.
+
 ## Viewing withheld clips
 
 ```bash

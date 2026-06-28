@@ -26,9 +26,11 @@ def main() -> None:
 
 @main.command()
 def reset() -> None:
-    """Kill any running cutter processes and clear all queues and state."""
+    """Kill any running cutter processes and delete all data, ready for a fresh start."""
+    import glob
     import json
     import os
+    import shutil
     import signal
     import subprocess
 
@@ -58,16 +60,23 @@ def reset() -> None:
 
     workdir = Path(platformdirs.user_data_dir("cutter"))
 
-    # Clear URL queue
-    queue_path = workdir / "queue.json"
-    queue_path.write_text(json.dumps({"last_whatsapp_scan": None, "items": []}, indent=2))
+    # Reset queue and approval state
+    (workdir / "queue.json").write_text(
+        json.dumps({"last_whatsapp_scan": None, "items": []}, indent=2)
+    )
+    (workdir / "approval_state.json").write_text(
+        json.dumps({"no_more_until": None, "videos": {}}, indent=2)
+    )
 
-    # Clear approval state
-    state_path = workdir / "approval_state.json"
-    state_path.write_text(json.dumps({"no_more_until": None, "videos": {}}, indent=2))
+    # Delete all video data (downloads, clips, captions)
+    deleted = 0
+    for item in workdir.iterdir():
+        if item.is_dir():
+            shutil.rmtree(item)
+            deleted += 1
 
-    console.print("[green]Queue and approval state cleared.[/green]")
-    console.print("[dim]Ready for a fresh run.[/dim]")
+    console.print(f"[green]Cleared queue, state, and {deleted} video folder(s).[/green]")
+    console.print("[dim]Ready for a fresh start.[/dim]")
 
 
 # ---------------------------------------------------------------------------
