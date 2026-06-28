@@ -39,7 +39,7 @@ class YouTubePoster:
         self._access_token = settings.youtube_access_token
 
     def post(self, clip_path: Path, caption: Caption | None) -> PostResult:
-        title = (caption.tiktok_caption[:100] if caption else clip_path.stem)
+        title = (caption.title or caption.tiktok_caption[:100]) if caption else clip_path.stem
         description = (caption.tiktok_caption if caption else "") + "\n\n#Shorts"
         tags = (caption.hashtags if caption else []) + ["Shorts"]
 

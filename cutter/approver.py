@@ -111,9 +111,8 @@ def _handle_reply(
     # --- Edit title ---
     m = re.match(r"(?:title|t)\s*[:\-]\s*(.+)", reply, re.IGNORECASE)
     if m:
-        current.tiktok_caption = m.group(1).strip()
-        current.instagram_caption = m.group(1).strip()
-        wa.send(_build_edit_ack("Title", current.tiktok_caption, clip_index, total_clips))
+        current.title = m.group(1).strip()
+        wa.send(_build_edit_ack("Title", current.title, clip_index, total_clips))
         return None  # keep conversation open
 
     # --- Edit TikTok caption only ---
@@ -174,7 +173,7 @@ def _build_prompt(
     def _trunc(text: str, limit: int = 400) -> str:
         return text if len(text) <= limit else text[:limit] + "…"
 
-    title = caption.tiktok_caption.splitlines()[0].strip()
+    title = caption.title or caption.tiktok_caption.splitlines()[0].strip()
 
     return (
         f"📹 *Clip {clip_index}/{total_clips}* — {title}\n\n"

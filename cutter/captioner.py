@@ -20,6 +20,7 @@ class Caption:
     tiktok_caption: str
     instagram_caption: str
     hashtags: list[str]
+    title: str = ""
 
     @property
     def hashtag_string(self) -> str:
@@ -72,6 +73,7 @@ def _generate_one(
 
     data = json.loads(text)
     return Caption(
+        title=data.get("title", ""),
         tiktok_caption=data["tiktok_caption"],
         instagram_caption=data["instagram_caption"],
         hashtags=data["hashtags"],
@@ -112,8 +114,16 @@ Requirements:
 - Use singular first-person voice throughout (I, my, me). Never use we, our, or us.
 - Do not fabricate claims not supported by the metadata.
 
+Also generate a short title for the clip (used as the YouTube title and shown during approval).
+- Max 60 characters.
+- A noun phrase or short statement — not a sentence beginning with "I".
+- Specific enough to be interesting on its own: name the subject, technique, or moment.
+- Not a summary of the description. Think: what would you tap on in a feed?
+- No hype words, no em dashes, no ellipses.
+
 Respond with valid JSON only, no markdown fences:
 {{
+  "title": "...",
   "tiktok_caption": "...",
   "instagram_caption": "...",
   "hashtags": ["tag1", "tag2"]
