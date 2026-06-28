@@ -339,7 +339,9 @@ def queue_list() -> None:
               show_default=True)
 @click.option("--approve/--no-approve", default=True,
               help="Ask for WhatsApp approval before posting (default: on)")
-def daily(post: str, approve: bool) -> None:
+@click.option("--max-clips", default=1, show_default=True,
+              help="Maximum clips to process per run (0 = no limit)")
+def daily(post: str, approve: bool, max_clips: int) -> None:
     """Process the next queued video. Designed to run from cron once a day."""
     import re
 
@@ -380,6 +382,7 @@ def daily(post: str, approve: bool) -> None:
         post=post,
         approve=approve,
         workdir=workdir,
+        max_clips=None if max_clips == 0 else max_clips,
     )
 
     try:

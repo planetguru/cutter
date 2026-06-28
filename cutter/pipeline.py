@@ -30,6 +30,7 @@ class PipelineOptions:
     captions: bool = True
     keep_raw: bool = False
     force: bool = False
+    max_clips: int | None = None  # cap clips processed per run (None = no limit)
     workdir: Path = field(
         default_factory=lambda: Path(platformdirs.user_data_dir("cutter"))
     )
@@ -115,6 +116,8 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
 
     # Filter to only pending clips (resume support)
     pending_clips = [c for c in final_clips if c.name in vs.pending]
+    if options.max_clips is not None:
+        pending_clips = pending_clips[: options.max_clips]
     reframed_dir = options.workdir / asset.video_id / "reframed"
 
     # WhatsApp client (only if approval mode)
