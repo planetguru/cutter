@@ -174,8 +174,10 @@ def _build_prompt(
     def _trunc(text: str, limit: int = 400) -> str:
         return text if len(text) <= limit else text[:limit] + "…"
 
+    title = caption.tiktok_caption.splitlines()[0].strip()
+
     return (
-        f"📹 *Clip {clip_index}/{total_clips}* — {clip_path.name}\n\n"
+        f"📹 *Clip {clip_index}/{total_clips}* — {title}\n\n"
         f"*TikTok:*\n{_trunc(caption.tiktok_caption)}\n\n"
         f"*Instagram:*\n{_trunc(caption.instagram_caption)}\n\n"
         f"*Tags:* {caption.hashtag_string}\n\n"
