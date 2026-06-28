@@ -171,16 +171,16 @@ def _build_prompt(
     if len(caption.hashtags) > 8:
         hashtag_preview += f" (+{len(caption.hashtags) - 8} more)"
 
+    def _trunc(text: str, limit: int = 400) -> str:
+        return text if len(text) <= limit else text[:limit] + "…"
+
     return (
         f"📹 *Clip {clip_index}/{total_clips}* — {clip_path.name}\n\n"
-        f"*TikTok caption:*\n{caption.tiktok_caption}\n\n"
-        f"*Instagram caption:*\n{caption.instagram_caption}\n\n"
-        f"*Hashtags:* {caption.hashtag_string}\n\n"
-        "Reply:\n"
-        "  *yes* — post this clip\n"
-        "  *no* — skip (move to withheld)\n"
-        "  *no more today* — stop until tomorrow\n"
-        "  *title: ...*  |  *desc: ...*  |  *tiktok: ...*  |  *instagram: ...*  |  *tags: #a #b*"
+        f"*TikTok:*\n{_trunc(caption.tiktok_caption)}\n\n"
+        f"*Instagram:*\n{_trunc(caption.instagram_caption)}\n\n"
+        f"*Tags:* {caption.hashtag_string}\n\n"
+        "Reply: *yes* · *no* · *no more today*\n"
+        "Edit: *title:* · *desc:* · *tiktok:* · *instagram:* · *tags:*"
     )
 
 
