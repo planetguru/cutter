@@ -105,7 +105,7 @@ class WhatsAppClient:
             if is_from_user and is_recent and is_inbound:
                 body = (msg.body or "").strip()
                 if body.lower().startswith("queue:"):
-                    url = body[6:].strip()
+                    url = body[6:].strip().strip("'\"'‘’“”")
                     if url:
                         urls.append(url)
 
