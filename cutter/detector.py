@@ -155,14 +155,33 @@ def _enforce_clip_lengths(
     # First pass: build initial segments from boundaries
     raw = list(zip(boundaries, boundaries[1:]))
 
-    # Merge segments that are too short by absorbing into the previous
+    # Merge segments that are too short.
+    # Short segments absorb into the previous one; if there is no previous
+    # (i.e. the very first boundary is tiny), carry the start forward and
+    # merge with the next segment instead.
     merged: list[tuple[float, float]] = []
+    pending_start: float | None = None
+
     for start, end in raw:
-        if merged and (end - start) < min_secs:
-            # Extend previous segment's end
-            merged[-1] = (merged[-1][0], end)
+        if pending_start is not None:
+            start = pending_start
+            pending_start = None
+
+        if (end - start) < min_secs:
+            if merged:
+                merged[-1] = (merged[-1][0], end)
+            else:
+                # First segment is too short — carry its start forward
+                pending_start = start
         else:
             merged.append((start, end))
+
+    # If pending_start is still set the entire video is shorter than min_secs
+    if pending_start is not None:
+        if merged:
+            merged[-1] = (merged[-1][0], raw[-1][1])
+        else:
+            merged.append((pending_start, raw[-1][1]))
 
     # Second pass: split segments that are too long
     final: list[tuple[float, float]] = []
