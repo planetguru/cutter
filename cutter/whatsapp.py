@@ -111,8 +111,8 @@ class WhatsAppClient:
 
         return urls
 
-    def scan_for_reset(self, since: datetime | None = None) -> bool:
-        """Return True if the user sent 'reset' since `since`."""
+    def scan_for_reset(self, since: datetime | None = None) -> datetime | None:
+        """Return the timestamp of the earliest 'reset' message since `since`, or None."""
         from datetime import timedelta
         if since is None:
             since = datetime.now(timezone.utc) - timedelta(days=1)
@@ -122,8 +122,11 @@ class WhatsAppClient:
         try:
             messages = self._client.messages.list(limit=50)
         except Exception:
-            return False
+            return None
 
+        # messages.list() returns most-recent-first; collect all matches then
+        # return the earliest so that any queue: messages sent after it are picked up.
+        reset_times: list[datetime] = []
         for msg in messages:
             sent_at = msg.date_created
             if sent_at and sent_at.tzinfo is None:
@@ -135,9 +138,9 @@ class WhatsAppClient:
 
             if is_from_user and is_recent and is_inbound:
                 if (msg.body or "").strip().lower() == "reset":
-                    return True
+                    reset_times.append(sent_at)
 
-        return False
+        return min(reset_times) if reset_times else None
 
 
 def _require_whatsapp(settings: Settings) -> None:

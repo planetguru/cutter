@@ -428,9 +428,9 @@ def daily(post: str, approve: bool, max_clips: int) -> None:
         wa = WhatsAppClient(settings)
         since = q.get_last_whatsapp_scan()
 
-        # Reset command takes priority over everything else
-        if wa.scan_for_reset(since=since):
-            import glob
+        # Reset command takes priority — but honour any queue: messages sent after it
+        reset_at = wa.scan_for_reset(since=since)
+        if reset_at is not None:
             import shutil
             import signal
             import subprocess as _sp
@@ -461,7 +461,17 @@ def daily(post: str, approve: bool, max_clips: int) -> None:
                 if item.is_dir():
                     shutil.rmtree(item)
                     deleted += 1
-            wa.send(f"Reset complete. Cleared queue and {deleted} video folder(s). Send queue:URL to start again.")
+            # Pick up any queue: messages sent after the reset message
+            post_reset_urls = wa.scan_queue_messages(since=reset_at)
+            for url in post_reset_urls:
+                if q.add(url):
+                    console.print(f"[dim]Queued from WhatsApp (post-reset): {url}[/dim]")
+            reply = "Reset complete. Cleared queue and {} video folder(s).".format(deleted)
+            if post_reset_urls:
+                reply += " Picked up {} queued URL(s) sent after the reset.".format(len(post_reset_urls))
+            else:
+                reply += " Send queue:URL to start again."
+            wa.send(reply)
             console.print("[green]Reset triggered via WhatsApp.[/green]")
             return
 
