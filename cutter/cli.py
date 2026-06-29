@@ -405,6 +405,8 @@ def queue_list() -> None:
               help="Maximum clips to process per run (0 = no limit)")
 def daily(post: str, approve: bool, max_clips: int) -> None:
     """Process the next queued video. Designed to run from cron once a day."""
+    import json
+    import os
     import re
 
     from . import queue as q
@@ -420,11 +422,49 @@ def daily(post: str, approve: bool, max_clips: int) -> None:
     settings = get_settings()
     workdir = Path(platformdirs.user_data_dir("cutter"))
 
-    # Check WhatsApp for queue: messages (best-effort)
+    # Check WhatsApp for commands (best-effort)
     try:
         from .whatsapp import WhatsAppClient
         wa = WhatsAppClient(settings)
         since = q.get_last_whatsapp_scan()
+
+        # Reset command takes priority over everything else
+        if wa.scan_for_reset(since=since):
+            import glob
+            import shutil
+            import signal
+            import subprocess as _sp
+            killed = 0
+            try:
+                result = _sp.run(["pgrep", "-f", "cutter"], capture_output=True, text=True)
+                my_pid = os.getpid()
+                for pid_str in result.stdout.splitlines():
+                    pid = int(pid_str.strip())
+                    if pid != my_pid:
+                        try:
+                            os.kill(pid, signal.SIGTERM)
+                            killed += 1
+                        except ProcessLookupError:
+                            pass
+            except Exception:
+                pass
+            from datetime import datetime, timezone as _tz
+            now_iso = datetime.now(_tz.utc).isoformat()
+            (workdir / "queue.json").write_text(
+                json.dumps({"last_whatsapp_scan": now_iso, "items": []}, indent=2)
+            )
+            (workdir / "approval_state.json").write_text(
+                json.dumps({"no_more_until": None, "videos": {}}, indent=2)
+            )
+            deleted = 0
+            for item in workdir.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item)
+                    deleted += 1
+            wa.send(f"Reset complete. Cleared queue and {deleted} video folder(s). Send queue:URL to start again.")
+            console.print("[green]Reset triggered via WhatsApp.[/green]")
+            return
+
         new_urls = wa.scan_queue_messages(since=since)
         q.update_last_whatsapp_scan()
         for url in new_urls:

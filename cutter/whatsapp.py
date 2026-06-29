@@ -111,6 +111,34 @@ class WhatsAppClient:
 
         return urls
 
+    def scan_for_reset(self, since: datetime | None = None) -> bool:
+        """Return True if the user sent 'reset' since `since`."""
+        from datetime import timedelta
+        if since is None:
+            since = datetime.now(timezone.utc) - timedelta(days=1)
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=timezone.utc)
+
+        try:
+            messages = self._client.messages.list(limit=50)
+        except Exception:
+            return False
+
+        for msg in messages:
+            sent_at = msg.date_created
+            if sent_at and sent_at.tzinfo is None:
+                sent_at = sent_at.replace(tzinfo=timezone.utc)
+
+            is_from_user = (msg.from_ or "").replace(" ", "") == self._to.replace(" ", "")
+            is_recent = sent_at is not None and sent_at > since
+            is_inbound = msg.direction == "inbound"
+
+            if is_from_user and is_recent and is_inbound:
+                if (msg.body or "").strip().lower() == "reset":
+                    return True
+
+        return False
+
 
 def _require_whatsapp(settings: Settings) -> None:
     missing = [
