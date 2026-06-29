@@ -28,8 +28,8 @@ class ApprovalResult:
     caption: Caption   # may be modified by user
 
 
-REPLY_TIMEOUT_SECS = 600   # 10 min before re-sending the prompt
-MAX_REPROMPTS = 3          # give up after this many timeouts with no reply
+REPLY_TIMEOUT_SECS = 21600  # 6 hours before re-sending the prompt
+MAX_REPROMPTS = 2           # give up after this many timeouts (12 hours total)
 
 
 def approve_clip(

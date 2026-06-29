@@ -47,7 +47,7 @@ fi
 CUTTER_BIN="$SCRIPT_DIR/.venv/bin/cutter"
 LOG_FILE="$SCRIPT_DIR/cutter.log"
 CRON_MARKER="$CUTTER_BIN daily"
-CRON_LINE="0 9 * * * $CRON_MARKER >> $LOG_FILE 2>&1"
+CRON_LINE="0 9 * * * caffeinate -i $CRON_MARKER >> $LOG_FILE 2>&1"
 
 if crontab -l 2>/dev/null | grep -qF "$CUTTER_BIN daily"; then
     echo "✓ Cron job already installed"
