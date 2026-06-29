@@ -102,6 +102,10 @@ def _download_video(url: str, dest: Path) -> None:
         "outtmpl": str(dest),
         "quiet": True,
         "no_warnings": True,
+        "retries": 10,
+        "fragment_retries": 10,
+        "continuedl": True,
+        "socket_timeout": 30,
     }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:

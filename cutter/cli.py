@@ -60,9 +60,12 @@ def reset() -> None:
 
     workdir = Path(platformdirs.user_data_dir("cutter"))
 
-    # Reset queue and approval state
+    # Reset queue and approval state.
+    # Set last_whatsapp_scan to now so we don't re-ingest old WhatsApp queue messages.
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
     (workdir / "queue.json").write_text(
-        json.dumps({"last_whatsapp_scan": None, "items": []}, indent=2)
+        json.dumps({"last_whatsapp_scan": now_iso, "items": []}, indent=2)
     )
     (workdir / "approval_state.json").write_text(
         json.dumps({"no_more_until": None, "videos": {}}, indent=2)

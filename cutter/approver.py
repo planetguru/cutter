@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import re
 import subprocess
 import tempfile
@@ -45,6 +46,7 @@ def approve_clip(
     Returns an ApprovalResult with the (possibly edited) caption.
     """
     current = Caption(
+        title=caption.title,
         tiktok_caption=caption.tiktok_caption,
         instagram_caption=caption.instagram_caption,
         hashtags=list(caption.hashtags),
@@ -60,16 +62,24 @@ def approve_clip(
             if video_url and reprompt == 0:
                 wa.send(media_url=video_url)
             sent_at = wa.send(_build_prompt(clip_path, current, clip_index, total_clips))
-            reply = wa.wait_for_reply(after=sent_at, timeout_secs=REPLY_TIMEOUT_SECS)
 
-            if reply is None:
-                if reprompt < MAX_REPROMPTS - 1:
-                    wa.send(f"⏰ Still waiting on clip {clip_index}/{total_clips}. Reply yes / no / no more today.")
-                continue
+            # Inner loop: handle edits without consuming a reprompt slot or
+            # re-sending the full prompt. Only a timeout breaks out to re-prompt.
+            while True:
+                reply = wa.wait_for_reply(after=sent_at, timeout_secs=REPLY_TIMEOUT_SECS)
 
-            result = _handle_reply(reply, current, clip_path, clip_index, total_clips, wa)
-            if result is not None:
-                return result
+                if reply is None:
+                    break  # timeout — outer loop will reprompt
+
+                result = _handle_reply(reply, current, clip_path, clip_index, total_clips, wa)
+                if result is not None:
+                    return result
+                # Edit was applied — advance the marker so we don't re-read it,
+                # but don't re-send the full prompt; just wait for the next reply.
+                sent_at = _dt.datetime.now(_dt.timezone.utc)
+
+            if reprompt < MAX_REPROMPTS - 1:
+                wa.send(f"⏰ Still waiting on clip {clip_index}/{total_clips}. Reply yes / no / no more today.")
 
         # Exhausted reprompts
         wa.send(f"⚠️ No response after {MAX_REPROMPTS} prompts. Skipping clip {clip_index}/{total_clips} for now.")
