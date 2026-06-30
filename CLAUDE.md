@@ -107,7 +107,7 @@ This means `cutter run` is idempotent: re-running the same URL resumes from wher
 
 **TikTok upload** (`poster/tiktok.py`): init → chunked PUT (10 MB) → poll status. Auto-refresh on 401.
 
-**Instagram upload** (`poster/instagram.py`): clips staged to S3 (public-read), Meta Graph API container → poll → publish → S3 cleanup. S3 credentials only validated when `--post instagram` or `--post both` is used.
+**Instagram upload** (`poster/instagram.py`): uses Meta's resumable upload protocol — `POST /{ig-user-id}/media` with `upload_type=resumable` returns a container ID and upload URI, video bytes are POSTed directly to Meta's servers, then container is polled and published. No external storage required.
 
 **Captions** (`captioner.py`): `claude-haiku-4-5-20251001`. Returns JSON — `tiktok_caption`, `instagram_caption`, `hashtags`. Tenacity retry for malformed JSON.
 
@@ -121,4 +121,4 @@ This means `cutter run` is idempotent: re-running the same URL resumes from wher
 - Python ≥ 3.11
 - Twilio account + WhatsApp sandbox: see `docs/whatsapp_setup.md`
 - TikTok API app: see `docs/tiktok_oauth.md`
-- Instagram Meta app + S3 bucket: see `docs/instagram_oauth.md`
+- Instagram Meta app: see `docs/instagram_oauth.md`

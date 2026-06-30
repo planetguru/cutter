@@ -53,12 +53,6 @@ class Settings:
         default_factory=lambda: os.getenv("PREVIEW_SSH_KEY") or str(Path.home() / ".ssh" / "id_ed25519")
     )
 
-    # S3 (Instagram video staging — only needed when posting to Instagram)
-    aws_access_key_id: str = field(default_factory=lambda: os.getenv("AWS_ACCESS_KEY_ID", ""))
-    aws_secret_access_key: str = field(default_factory=lambda: os.getenv("AWS_SECRET_ACCESS_KEY", ""))
-    aws_s3_bucket: str = field(default_factory=lambda: os.getenv("AWS_S3_BUCKET", ""))
-    aws_s3_region: str = field(default_factory=lambda: os.getenv("AWS_S3_REGION", "us-east-1"))
-
     # YouTube
     youtube_client_id: str = field(default_factory=lambda: os.getenv("YOUTUBE_CLIENT_ID", ""))
     youtube_client_secret: str = field(default_factory=lambda: os.getenv("YOUTUBE_CLIENT_SECRET", ""))
@@ -88,14 +82,6 @@ class Settings:
         if missing:
             raise ConfigError(
                 f"Instagram credentials missing: {', '.join(missing).upper()}. Run: cutter auth instagram"
-            )
-        s3_missing = [
-            k for k in ("aws_access_key_id", "aws_secret_access_key", "aws_s3_bucket")
-            if not getattr(self, k)
-        ]
-        if s3_missing:
-            raise ConfigError(
-                f"S3 credentials missing: {', '.join(s3_missing).upper()}. Required for Instagram video upload."
             )
 
     def require_youtube(self) -> None:

@@ -16,7 +16,6 @@ dependencies = [
     "tenacity>=8.5",
     "rich>=13.7",
     "platformdirs>=4.2",
-    "boto3>=1.35",
     "twilio>=9.3",
 ]
 

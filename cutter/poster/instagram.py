@@ -11,7 +11,6 @@ import webbrowser
 from pathlib import Path
 from typing import Any
 
-import boto3
 import requests
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
@@ -43,49 +42,22 @@ class InstagramPoster:
             text = f"{caption.instagram_caption}\n\n{caption.hashtag_string}".strip()[:2200]
 
         try:
-            video_url = self._stage_to_s3(clip_path)
-            container_id = self._create_container(video_url, text)
+            container_id, upload_uri = self._init_upload(text)
+            self._upload_video(upload_uri, clip_path)
             self._poll_container(container_id)
-            self._delete_from_s3(clip_path.name)
             media_id = self._publish(container_id)
             url = f"https://www.instagram.com/p/{media_id}/"
             return PostResult(platform="instagram", clip_path=clip_path, url=url, publish_id=media_id)
         except InstagramError as e:
             return PostResult(platform="instagram", clip_path=clip_path, error=str(e))
 
-    def _stage_to_s3(self, clip_path: Path) -> str:
-        s = self.settings
-        client = boto3.client(
-            "s3",
-            region_name=s.aws_s3_region,
-            aws_access_key_id=s.aws_access_key_id,
-            aws_secret_access_key=s.aws_secret_access_key,
-        )
-        key = f"cutter-temp/{clip_path.name}"
-        client.upload_file(
-            str(clip_path),
-            s.aws_s3_bucket,
-            key,
-            ExtraArgs={"ContentType": "video/mp4", "ACL": "public-read"},
-        )
-        return f"https://{s.aws_s3_bucket}.s3.{s.aws_s3_region}.amazonaws.com/{key}"
-
-    def _delete_from_s3(self, filename: str) -> None:
-        s = self.settings
-        client = boto3.client(
-            "s3",
-            region_name=s.aws_s3_region,
-            aws_access_key_id=s.aws_access_key_id,
-            aws_secret_access_key=s.aws_secret_access_key,
-        )
-        client.delete_object(Bucket=s.aws_s3_bucket, Key=f"cutter-temp/{filename}")
-
-    def _create_container(self, video_url: str, caption: str) -> str:
+    def _init_upload(self, caption: str) -> tuple[str, str]:
+        """Create a resumable upload container. Returns (container_id, upload_uri)."""
         resp = requests.post(
             f"{GRAPH_BASE}/{self._account_id}/media",
             params={
                 "media_type": "REELS",
-                "video_url": video_url,
+                "upload_type": "resumable",
                 "caption": caption,
                 "share_to_feed": "true",
                 "access_token": self._access_token,
@@ -93,7 +65,25 @@ class InstagramPoster:
             timeout=60,
         )
         self._check_response(resp)
-        return resp.json()["id"]
+        data = resp.json()
+        return data["id"], data["uri"]
+
+    def _upload_video(self, upload_uri: str, clip_path: Path) -> None:
+        """Upload video bytes directly to Meta's resumable upload endpoint."""
+        file_size = clip_path.stat().st_size
+        with clip_path.open("rb") as f:
+            resp = requests.post(
+                upload_uri,
+                headers={
+                    "Authorization": f"OAuth {self._access_token}",
+                    "file_size": str(file_size),
+                    "Content-Type": "application/octet-stream",
+                },
+                data=f,
+                timeout=300,
+            )
+        if not resp.ok:
+            raise InstagramError(f"Video upload failed {resp.status_code}: {resp.text[:400]}")
 
     @retry(
         wait=wait_exponential(min=5, max=30),
