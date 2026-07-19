@@ -183,6 +183,16 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
             if successes:
                 platforms = " & ".join(r.platform.title() for r in successes)
                 wa.send(f"🚀 Clip {i}/{total} posted to {platforms}!")
+            tiktok_inbox = settings.tiktok_post_mode != "direct" and any(
+                r.platform == "tiktok" for r in successes
+            )
+            if tiktok_inbox:
+                from .poster.tiktok import build_caption
+                wa.send(
+                    "📥 TikTok clip is waiting in your app inbox — open the "
+                    "notification to publish it. Caption to paste:\n\n"
+                    f"{build_caption(cap, clip_path)}"
+                )
 
         results.append(clip_result)
 

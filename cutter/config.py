@@ -31,6 +31,14 @@ class Settings:
     tiktok_access_token: str = field(default_factory=lambda: os.getenv("TIKTOK_ACCESS_TOKEN", ""))
     tiktok_refresh_token: str = field(default_factory=lambda: os.getenv("TIKTOK_REFRESH_TOKEN", ""))
     tiktok_open_id: str = field(default_factory=lambda: os.getenv("TIKTOK_OPEN_ID", ""))
+    # "inbox" sends clips to the user's TikTok inbox to finish in-app (works for
+    # unaudited/sandbox apps); "direct" posts publicly but requires an audited app.
+    tiktok_post_mode: str = field(default_factory=lambda: os.getenv("TIKTOK_POST_MODE", "inbox"))
+    # Must match the Desktop Redirect URI registered in the TikTok developer
+    # portal character-for-character.
+    tiktok_redirect_uri: str = field(
+        default_factory=lambda: os.getenv("TIKTOK_REDIRECT_URI", "http://localhost:8080/callback")
+    )
 
     # Instagram / Meta
     instagram_app_id: str = field(default_factory=lambda: os.getenv("INSTAGRAM_APP_ID", ""))
