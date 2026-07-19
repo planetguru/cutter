@@ -50,7 +50,8 @@ def approve_clip(
 
     for reprompt in range(MAX_REPROMPTS):
         if reprompt == 0:
-            wa.send_video(clip_path)
+            title = current.title or current.tiktok_caption.splitlines()[0].strip()
+            wa.send_video(clip_path, caption=f"📹 Clip {clip_index}/{total_clips} — {title}")
         sent_at = wa.send(_build_prompt(clip_path, current, clip_index, total_clips))
 
         # Inner loop: handle edits without consuming a reprompt slot or

@@ -43,7 +43,7 @@ def reframe(clip_path: Path, out_path: Path) -> None:
         f"boxblur=luma_radius=30:luma_power=3:chroma_radius=30:chroma_power=3[bg];"
         f"[0:v]scale=w='min({TARGET_W},iw)':h='min({TARGET_H},ih)'"
         f":force_original_aspect_ratio=decrease[fg];"
-        f"[bg][fg]overlay=x=(W-w)/2:y=(H-h)/2[v]"
+        f"[bg][fg]overlay=x=(W-w)/2:y=(H-h)/2,setsar=1[v]"
     )
     cmd = [
         "ffmpeg",

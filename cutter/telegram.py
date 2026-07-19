@@ -52,7 +52,10 @@ class TelegramClient:
 
     def send_video(self, path: Path, caption: str = "") -> datetime:
         """Upload a local video file to the chat."""
-        data = {"chat_id": self._chat_id}
+        # The Bot API doesn't probe uploads — without explicit dimensions,
+        # clients render the video at a wrong aspect ratio.
+        data = {"chat_id": self._chat_id, "supports_streaming": "true"}
+        data.update(_probe_video(path))
         if caption:
             data["caption"] = caption[:1024]
         with path.open("rb") as fh:
@@ -209,6 +212,29 @@ def run_setup(settings: Settings) -> None:
                 print(f"Chat ID {chat_id} ({name}) saved to .env — Telegram is ready.")
                 return
     raise TelegramError("Timed out waiting for a message to the bot.")
+
+
+def _probe_video(path: Path) -> dict:
+    """Return width/height/duration for sendVideo; empty dict if ffprobe fails."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            [
+                "ffprobe", "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=width,height:format=duration",
+                "-of", "json", str(path),
+            ],
+            capture_output=True, timeout=30,
+        )
+        info = json.loads(out.stdout)
+        stream = info["streams"][0]
+        return {
+            "width": stream["width"],
+            "height": stream["height"],
+            "duration": int(float(info["format"]["duration"])),
+        }
+    except Exception:
+        return {}
 
 
 def _default_since(since: datetime | None, days: int) -> datetime:
