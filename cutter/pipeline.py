@@ -11,7 +11,7 @@ from rich.console import Console
 from . import captioner, detector, downloader, reframer, slicer
 from .approver import Decision, approve_clip
 from .captioner import Caption
-from .config import Settings, check_ffmpeg, get_settings
+from .config import ConfigError, Settings, check_ffmpeg, get_settings
 from .poster.base import PostResult
 from .state import StateStore
 from .telegram import TelegramClient
@@ -80,13 +80,27 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
     check_ffmpeg()
     settings = get_settings()
 
-    # Validate posting credentials early (manual TikTok mode needs no API creds)
-    if options.post in ("tiktok", "both", "all") and settings.tiktok_post_mode != "manual":
-        settings.require_tiktok()
-    if options.post in ("instagram", "both", "all"):
-        settings.require_instagram()
-    if options.post in ("youtube", "all"):
-        settings.require_youtube()
+    # Resolve target platforms, skipping any without credentials so a single
+    # unconfigured platform doesn't sink the whole daily run.
+    requested = {
+        "all": {"tiktok", "instagram", "youtube"},
+        "both": {"tiktok", "instagram"},
+        "none": set(),
+    }.get(options.post, {options.post})
+    platforms: set[str] = set()
+    for platform in sorted(requested):
+        try:
+            if platform == "tiktok" and settings.tiktok_post_mode != "manual":
+                settings.require_tiktok()
+            elif platform == "instagram":
+                settings.require_instagram()
+            elif platform == "youtube":
+                settings.require_youtube()
+            platforms.add(platform)
+        except ConfigError as e:
+            console.print(f"[yellow]Skipping {platform} (not configured): {e}[/yellow]")
+    if requested and not platforms:
+        console.print("[yellow]No posting platform is configured — clips will be approved but not posted.[/yellow]")
     if options.captions:
         settings.require_anthropic()
 
@@ -186,7 +200,7 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
         # --- Post ---
         clip_result = ClipResult(clip_path=clip_path, caption=cap)
 
-        if options.post in ("tiktok", "both", "all"):
+        if "tiktok" in platforms:
             if settings.tiktok_post_mode == "manual":
                 post_result = _manual_tiktok_handoff(clip_path, cap, wa, settings)
             else:
@@ -194,12 +208,12 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
                 post_result = TikTokPoster(settings).post(clip_path, cap)
             clip_result.post_results.append(post_result)
 
-        if options.post in ("instagram", "both", "all"):
+        if "instagram" in platforms:
             from .poster.instagram import InstagramPoster
             post_result = InstagramPoster(settings).post(clip_path, cap)
             clip_result.post_results.append(post_result)
 
-        if options.post in ("youtube", "all"):
+        if "youtube" in platforms:
             from .poster.youtube import YouTubePoster
             post_result = YouTubePoster(settings).post(clip_path, cap)
             clip_result.post_results.append(post_result)

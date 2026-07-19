@@ -113,9 +113,9 @@ class TelegramClient:
 
     # -- internals ----------------------------------------------------------
 
-    def _api(self, method: str, *, timeout: int = 30, **params) -> dict:
+    def _api(self, method: str, *, http_timeout: int = 30, **params) -> dict:
         try:
-            resp = requests.post(f"{self._base}/{method}", json=params, timeout=timeout)
+            resp = requests.post(f"{self._base}/{method}", json=params, timeout=http_timeout)
             payload = resp.json()
         except Exception as e:
             raise TelegramError(f"{method} request failed: {e}") from e
@@ -132,7 +132,7 @@ class TelegramClient:
         try:
             updates = self._api(
                 "getUpdates",
-                timeout=self.LONG_POLL_SECS + 10 if long_poll else 30,
+                http_timeout=self.LONG_POLL_SECS + 10 if long_poll else 30,
                 **params,
             )
         except TelegramError as e:
