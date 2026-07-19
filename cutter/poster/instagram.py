@@ -1,9 +1,20 @@
-"""Instagram Reels posting via Meta Graph API v21."""
+"""Instagram Reels posting via the Instagram API with Instagram Login.
+
+This is Meta's newer, Facebook-Page-free API (graph.instagram.com): you
+authenticate as the Instagram professional account itself. Meta has disabled
+Page↔Instagram linking for many accounts, which broke the older Facebook-Login
+flavour of this integration.
+
+The trade-off: graph.instagram.com has no resumable byte upload — containers
+ingest from a public `video_url`, so clips are staged temporarily on the media
+server (MEDIA_* in .env) during posting.
+"""
 
 from __future__ import annotations
 
 import http.server
 import secrets
+import subprocess
 import threading
 import time
 import urllib.parse
@@ -15,14 +26,16 @@ import requests
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from ..captioner import Caption
-from ..config import ENV_PATH, Settings
+from ..config import Settings
 from .base import PostResult
 from .tiktok import _update_env
 
-GRAPH_BASE = "https://graph.facebook.com/v21.0"
-AUTH_URL = "https://www.facebook.com/v21.0/dialog/oauth"
-TOKEN_URL = f"{GRAPH_BASE}/oauth/access_token"
-LONG_LIVED_URL = f"https://graph.facebook.com/oauth/access_token"
+GRAPH_BASE = "https://graph.instagram.com/v23.0"
+AUTH_URL = "https://www.instagram.com/oauth/authorize"
+TOKEN_URL = "https://api.instagram.com/oauth/access_token"
+LONG_LIVED_URL = "https://graph.instagram.com/access_token"
+REFRESH_URL = "https://graph.instagram.com/refresh_access_token"
+SCOPES = "instagram_business_basic,instagram_business_content_publish"
 
 
 class InstagramError(Exception):
@@ -41,23 +54,63 @@ class InstagramPoster:
         if caption:
             text = f"{caption.instagram_caption}\n\n{caption.hashtag_string}".strip()[:2200]
 
+        remote_name = None
         try:
-            container_id, upload_uri = self._init_upload(text)
-            self._upload_video(upload_uri, clip_path)
+            remote_name, video_url = self._stage_media(clip_path)
+            container_id = self._create_container(video_url, text)
             self._poll_container(container_id)
             media_id = self._publish(container_id)
             url = f"https://www.instagram.com/p/{media_id}/"
             return PostResult(platform="instagram", clip_path=clip_path, url=url, publish_id=media_id)
         except InstagramError as e:
             return PostResult(platform="instagram", clip_path=clip_path, error=str(e))
+        finally:
+            if remote_name:
+                self._unstage_media(remote_name)
 
-    def _init_upload(self, caption: str) -> tuple[str, str]:
-        """Create a resumable upload container. Returns (container_id, upload_uri)."""
+    # -- media staging (Instagram ingests from a public URL) -----------------
+
+    def _stage_media(self, clip_path: Path) -> tuple[str, str]:
+        s = self.settings
+        if not (s.media_host and s.media_webroot and s.media_base_url):
+            raise InstagramError("MEDIA_HOST/MEDIA_WEBROOT/MEDIA_BASE_URL must be set in .env")
+        remote_name = f"{clip_path.stem}_{secrets.token_hex(4)}_ig.mp4"
+        ssh_key = str(Path(s.media_ssh_key).expanduser())
+        dest = f"{s.media_user}@{s.media_host}:{s.media_webroot}/{remote_name}"
+        result = subprocess.run(
+            ["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
+             str(clip_path), dest],
+            capture_output=True, timeout=180,
+        )
+        if result.returncode != 0:
+            raise InstagramError(f"Failed to stage clip on media server: {result.stderr.decode().strip()}")
+        subprocess.run(
+            ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
+             f"{s.media_user}@{s.media_host}", f"chmod 644 {s.media_webroot}/{remote_name}"],
+            capture_output=True, timeout=30,
+        )
+        return remote_name, f"{s.media_base_url}/{remote_name}"
+
+    def _unstage_media(self, remote_name: str) -> None:
+        s = self.settings
+        ssh_key = str(Path(s.media_ssh_key).expanduser())
+        try:
+            subprocess.run(
+                ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
+                 f"{s.media_user}@{s.media_host}", f"rm -f {s.media_webroot}/{remote_name}"],
+                capture_output=True, timeout=30,
+            )
+        except Exception:
+            pass  # best-effort cleanup
+
+    # -- publishing -----------------------------------------------------------
+
+    def _create_container(self, video_url: str, caption: str) -> str:
         resp = requests.post(
             f"{GRAPH_BASE}/{self._account_id}/media",
             params={
                 "media_type": "REELS",
-                "upload_type": "resumable",
+                "video_url": video_url,
                 "caption": caption,
                 "share_to_feed": "true",
                 "access_token": self._access_token,
@@ -65,25 +118,7 @@ class InstagramPoster:
             timeout=60,
         )
         self._check_response(resp)
-        data = resp.json()
-        return data["id"], data["uri"]
-
-    def _upload_video(self, upload_uri: str, clip_path: Path) -> None:
-        """Upload video bytes directly to Meta's resumable upload endpoint."""
-        file_size = clip_path.stat().st_size
-        with clip_path.open("rb") as f:
-            resp = requests.post(
-                upload_uri,
-                headers={
-                    "Authorization": f"OAuth {self._access_token}",
-                    "file_size": str(file_size),
-                    "Content-Type": "application/octet-stream",
-                },
-                data=f,
-                timeout=300,
-            )
-        if not resp.ok:
-            raise InstagramError(f"Video upload failed {resp.status_code}: {resp.text[:400]}")
+        return resp.json()["id"]
 
     @retry(
         wait=wait_exponential(min=5, max=30),
@@ -125,21 +160,23 @@ class InstagramPoster:
 
 
 def run_oauth_flow(settings: Settings, refresh: bool = False) -> None:
-    """Run Meta OAuth and write long-lived token to .env."""
+    """Run Instagram-Login OAuth and write a long-lived token to .env.
+
+    Instagram requires an HTTPS redirect URI, so the registered URI is a page
+    on the media server that immediately bounces the browser (with the auth
+    code) back to the local listener on port 8080.
+    """
     if refresh:
         _refresh_long_lived_token(settings)
         return
 
-    state = secrets.token_urlsafe(16)
-    redirect_uri = "http://localhost:8080/callback"
-    scope = "instagram_basic,instagram_content_publish,pages_read_engagement"
-
+    redirect_uri = settings.instagram_redirect_uri
     auth_params = {
         "client_id": settings.instagram_app_id,
         "redirect_uri": redirect_uri,
-        "scope": scope,
+        "scope": SCOPES,
         "response_type": "code",
-        "state": state,
+        "state": secrets.token_urlsafe(16),
     }
     auth_url = AUTH_URL + "?" + urllib.parse.urlencode(auth_params)
 
@@ -149,8 +186,9 @@ def run_oauth_flow(settings: Settings, refresh: bool = False) -> None:
         def do_GET(self) -> None:
             parsed = urllib.parse.urlparse(self.path)
             qs = urllib.parse.parse_qs(parsed.query)
-            if parsed.path == "/callback" and "code" in qs:
-                code_holder.append(qs["code"][0])
+            if "code" in qs:
+                # Instagram appends '#_' to the redirect; strip any fragment junk.
+                code_holder.append(qs["code"][0].split("#")[0])
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b"<h1>Instagram auth complete. You can close this tab.</h1>")
@@ -178,12 +216,13 @@ def run_oauth_flow(settings: Settings, refresh: bool = False) -> None:
     if not code_holder:
         raise InstagramError("Timed out waiting for OAuth callback.")
 
-    # Exchange code for short-lived token
-    resp = requests.get(
+    # Exchange code for a short-lived token (1 h)
+    resp = requests.post(
         TOKEN_URL,
-        params={
+        data={
             "client_id": settings.instagram_app_id,
             "client_secret": settings.instagram_app_secret,
+            "grant_type": "authorization_code",
             "redirect_uri": redirect_uri,
             "code": code_holder[0],
         },
@@ -191,62 +230,46 @@ def run_oauth_flow(settings: Settings, refresh: bool = False) -> None:
     )
     if not resp.ok:
         raise InstagramError(f"Token exchange failed: {resp.text}")
-
     short_token = resp.json()["access_token"]
 
-    # Upgrade to long-lived token (60 days)
+    # Upgrade to a long-lived token (60 days)
     resp2 = requests.get(
         LONG_LIVED_URL,
         params={
-            "grant_type": "fb_exchange_token",
-            "client_id": settings.instagram_app_id,
+            "grant_type": "ig_exchange_token",
             "client_secret": settings.instagram_app_secret,
-            "fb_exchange_token": short_token,
+            "access_token": short_token,
         },
         timeout=30,
     )
     if not resp2.ok:
         raise InstagramError(f"Long-lived token exchange failed: {resp2.text}")
-
     long_token = resp2.json()["access_token"]
     _update_env("INSTAGRAM_ACCESS_TOKEN", long_token)
 
-    # Fetch Instagram account ID
-    me_resp = requests.get(
-        f"{GRAPH_BASE}/me/accounts",
-        params={"access_token": long_token},
+    # The professional account ID used by the publishing endpoints
+    me = requests.get(
+        f"{GRAPH_BASE}/me",
+        params={"fields": "user_id,username", "access_token": long_token},
         timeout=30,
     )
-    if me_resp.ok:
-        pages = me_resp.json().get("data", [])
-        if pages:
-            page_token = pages[0]["access_token"]
-            ig_resp = requests.get(
-                f"{GRAPH_BASE}/{pages[0]['id']}",
-                params={"fields": "instagram_business_account", "access_token": page_token},
-                timeout=30,
-            )
-            if ig_resp.ok:
-                ig_id = ig_resp.json().get("instagram_business_account", {}).get("id", "")
-                if ig_id:
-                    _update_env("INSTAGRAM_ACCOUNT_ID", ig_id)
-                    print(f"Instagram account ID set: {ig_id}")
-
-    print("Instagram token saved to .env (expires in ~60 days; run: cutter auth instagram --refresh)")
+    if not me.ok:
+        raise InstagramError(f"Could not fetch account info: {me.text}")
+    data = me.json()
+    _update_env("INSTAGRAM_ACCOUNT_ID", str(data["user_id"]))
+    print(f"Authorized as @{data.get('username', '?')} — account ID {data['user_id']} saved to .env.")
 
 
 def _refresh_long_lived_token(settings: Settings) -> None:
     resp = requests.get(
-        f"{GRAPH_BASE}/oauth/access_token",
+        REFRESH_URL,
         params={
-            "grant_type": "fb_exchange_token",
-            "client_id": settings.instagram_app_id,
-            "client_secret": settings.instagram_app_secret,
-            "fb_exchange_token": settings.instagram_access_token,
+            "grant_type": "ig_refresh_token",
+            "access_token": settings.instagram_access_token,
         },
         timeout=30,
     )
     if not resp.ok:
         raise InstagramError(f"Token refresh failed: {resp.text}")
     _update_env("INSTAGRAM_ACCESS_TOKEN", resp.json()["access_token"])
-    print("Instagram access token refreshed.")
+    print("Instagram token refreshed (valid another 60 days).")

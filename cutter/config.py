@@ -48,10 +48,25 @@ class Settings:
     instagram_app_secret: str = field(default_factory=lambda: os.getenv("INSTAGRAM_APP_SECRET", ""))
     instagram_access_token: str = field(default_factory=lambda: os.getenv("INSTAGRAM_ACCESS_TOKEN", ""))
     instagram_account_id: str = field(default_factory=lambda: os.getenv("INSTAGRAM_ACCOUNT_ID", ""))
+    # Must be HTTPS and registered in the app's Instagram business login
+    # settings; the page bounces the code back to localhost:8080.
+    instagram_redirect_uri: str = field(
+        default_factory=lambda: os.getenv("INSTAGRAM_REDIRECT_URI", "https://cutter.chris.uk.com/instagram/callback")
+    )
 
     # Telegram (approval conversations + notifications)
     telegram_bot_token: str = field(default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN", ""))
     telegram_chat_id: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", ""))
+
+    # Media staging server — Instagram's API ingests videos from a public URL,
+    # so clips are scp'd here temporarily during posting.
+    media_host: str = field(default_factory=lambda: os.getenv("MEDIA_HOST", ""))
+    media_user: str = field(default_factory=lambda: os.getenv("MEDIA_USER", "root"))
+    media_webroot: str = field(default_factory=lambda: os.getenv("MEDIA_WEBROOT", ""))
+    media_base_url: str = field(default_factory=lambda: os.getenv("MEDIA_BASE_URL", ""))
+    media_ssh_key: str = field(
+        default_factory=lambda: os.getenv("MEDIA_SSH_KEY") or str(Path.home() / ".ssh" / "id_ed25519")
+    )
 
     # YouTube
     youtube_client_id: str = field(default_factory=lambda: os.getenv("YOUTUBE_CLIENT_ID", ""))

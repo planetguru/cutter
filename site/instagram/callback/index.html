@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cutter — Instagram auth</title>
+<meta name="robots" content="noindex">
+</head>
+<body>
+<p>Completing Instagram authentication…</p>
+<script>
+  // Instagram login requires an HTTPS redirect URI, so it redirects here
+  // instead; bounce the auth code on to the cutter CLI's local listener.
+  location.replace("http://localhost:8080/callback" + location.search);
+</script>
+<noscript><p>JavaScript is required. Copy this page's full URL and paste it into the cutter terminal.</p></noscript>
+</body>
+</html>
