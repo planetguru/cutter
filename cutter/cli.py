@@ -61,11 +61,11 @@ def reset() -> None:
     workdir = Path(platformdirs.user_data_dir("cutter"))
 
     # Reset queue and approval state.
-    # Set last_whatsapp_scan to now so we don't re-ingest old WhatsApp queue messages.
+    # Set last_message_scan to now so we don't re-ingest old queue messages.
     from datetime import datetime, timezone
     now_iso = datetime.now(timezone.utc).isoformat()
     (workdir / "queue.json").write_text(
-        json.dumps({"last_whatsapp_scan": now_iso, "items": []}, indent=2)
+        json.dumps({"last_message_scan": now_iso, "items": []}, indent=2)
     )
     (workdir / "approval_state.json").write_text(
         json.dumps({"no_more_until": None, "videos": {}}, indent=2)
@@ -89,7 +89,7 @@ def reset() -> None:
 @main.command()
 @click.option("--url", required=True, help="YouTube video URL")
 @click.option("--post", default="none", type=click.Choice(["tiktok", "instagram", "youtube", "both", "all", "none"]), show_default=True, help="Platform(s) to post to: tiktok, instagram, youtube, both (tiktok+instagram), all (all three), or none")
-@click.option("--approve/--no-approve", default=False, help="Ask for WhatsApp approval before each post")
+@click.option("--approve/--no-approve", default=False, help="Ask for Telegram approval before each post")
 @click.option("--min-clip", default=25, show_default=True, help="Minimum clip length in seconds")
 @click.option("--max-clip", default=55, show_default=True, help="Maximum clip length in seconds")
 @click.option("--scene-threshold", default=12.0, show_default=True, help="scdet threshold (0–100)")
@@ -327,6 +327,19 @@ def instagram(refresh: bool) -> None:
 
 
 @auth.command()
+def telegram() -> None:
+    """Discover and save your Telegram chat ID (needs TELEGRAM_BOT_TOKEN in .env)."""
+    from .telegram import TelegramError, run_setup
+
+    settings = get_settings()
+    try:
+        run_setup(settings)
+    except TelegramError as e:
+        console.print(f"[red]Telegram setup error:[/red] {e}")
+        raise SystemExit(1)
+
+
+@auth.command()
 def youtube() -> None:
     """Run YouTube OAuth flow and save tokens to .env."""
     from .poster.youtube import YouTubeError, run_oauth_flow
@@ -400,7 +413,7 @@ def queue_list() -> None:
               type=click.Choice(["tiktok", "instagram", "youtube", "both", "all", "none"]),
               show_default=True)
 @click.option("--approve/--no-approve", default=True,
-              help="Ask for WhatsApp approval before posting (default: on)")
+              help="Ask for Telegram approval before posting (default: on)")
 @click.option("--max-clips", default=1, show_default=True,
               help="Maximum clips to process per run (0 = no limit)")
 def daily(post: str, approve: bool, max_clips: int) -> None:
@@ -422,11 +435,11 @@ def daily(post: str, approve: bool, max_clips: int) -> None:
     settings = get_settings()
     workdir = Path(platformdirs.user_data_dir("cutter"))
 
-    # Check WhatsApp for commands (best-effort)
+    # Check Telegram for commands (best-effort)
     try:
-        from .whatsapp import WhatsAppClient
-        wa = WhatsAppClient(settings)
-        since = q.get_last_whatsapp_scan()
+        from .telegram import TelegramClient
+        wa = TelegramClient(settings)
+        since = q.get_last_message_scan()
 
         # Reset command takes priority — but honour any queue: messages sent after it
         reset_at = wa.scan_for_reset(since=since)
@@ -451,7 +464,7 @@ def daily(post: str, approve: bool, max_clips: int) -> None:
             from datetime import datetime, timezone as _tz
             now_iso = datetime.now(_tz.utc).isoformat()
             (workdir / "queue.json").write_text(
-                json.dumps({"last_whatsapp_scan": now_iso, "items": []}, indent=2)
+                json.dumps({"last_message_scan": now_iso, "items": []}, indent=2)
             )
             (workdir / "approval_state.json").write_text(
                 json.dumps({"no_more_until": None, "videos": {}}, indent=2)
@@ -465,21 +478,21 @@ def daily(post: str, approve: bool, max_clips: int) -> None:
             post_reset_urls = wa.scan_queue_messages(since=reset_at)
             for url in post_reset_urls:
                 if q.add(url):
-                    console.print(f"[dim]Queued from WhatsApp (post-reset): {url}[/dim]")
+                    console.print(f"[dim]Queued from message (post-reset): {url}[/dim]")
             reply = "Reset complete. Cleared queue and {} video folder(s).".format(deleted)
             if post_reset_urls:
                 reply += " Picked up {} queued URL(s) sent after the reset.".format(len(post_reset_urls))
             else:
                 reply += " Send queue:URL to start again."
             wa.send(reply)
-            console.print("[green]Reset triggered via WhatsApp.[/green]")
+            console.print("[green]Reset triggered via message.[/green]")
             return
 
         new_urls = wa.scan_queue_messages(since=since)
-        q.update_last_whatsapp_scan()
+        q.update_last_message_scan()
         for url in new_urls:
             if q.add(url):
-                console.print(f"[dim]Queued from WhatsApp: {url}[/dim]")
+                console.print(f"[dim]Queued from message: {url}[/dim]")
     except Exception:
         pass
 

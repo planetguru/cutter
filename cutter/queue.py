@@ -26,7 +26,7 @@ class QueueItem:
 @dataclass
 class QueueFile:
     items: list[QueueItem] = field(default_factory=list)
-    last_whatsapp_scan: str | None = None
+    last_message_scan: str | None = None
 
 
 def _load() -> QueueFile:
@@ -35,7 +35,8 @@ def _load() -> QueueFile:
     try:
         raw = json.loads(QUEUE_PATH.read_text())
         items = [QueueItem(**i) for i in raw.get("items", [])]
-        return QueueFile(items=items, last_whatsapp_scan=raw.get("last_whatsapp_scan"))
+        scan = raw.get("last_message_scan") or raw.get("last_whatsapp_scan")  # legacy key
+        return QueueFile(items=items, last_message_scan=scan)
     except Exception:
         return QueueFile()
 
@@ -43,7 +44,7 @@ def _load() -> QueueFile:
 def _save(qf: QueueFile) -> None:
     QUEUE_PATH.parent.mkdir(parents=True, exist_ok=True)
     data = {
-        "last_whatsapp_scan": qf.last_whatsapp_scan,
+        "last_message_scan": qf.last_message_scan,
         "items": [asdict(i) for i in qf.items],
     }
     QUEUE_PATH.write_text(json.dumps(data, indent=2))
@@ -77,19 +78,19 @@ def mark_used(url: str) -> None:
     _save(qf)
 
 
-def get_last_whatsapp_scan() -> datetime | None:
+def get_last_message_scan() -> datetime | None:
     qf = _load()
-    if not qf.last_whatsapp_scan:
+    if not qf.last_message_scan:
         return None
     try:
-        return datetime.fromisoformat(qf.last_whatsapp_scan)
+        return datetime.fromisoformat(qf.last_message_scan)
     except ValueError:
         return None
 
 
-def update_last_whatsapp_scan() -> None:
+def update_last_message_scan() -> None:
     qf = _load()
-    qf.last_whatsapp_scan = datetime.now(timezone.utc).isoformat()
+    qf.last_message_scan = datetime.now(timezone.utc).isoformat()
     _save(qf)
 
 

@@ -13,13 +13,10 @@
 >   account is private, and is forced to `SELF_ONLY` visibility regardless.
 >
 > cutter therefore defaults to **manual mode** (`TIKTOK_POST_MODE=manual`): the
-> TikTok API is not used at all. After approval, the finished clip is uploaded
-> to the preview server (`PREVIEW_HOST` etc. in `.env`) and WhatsApp sends you
-> the download link plus the ready-to-paste caption — you post from the phone.
-> No TikTok credentials are needed in this mode; everything below only applies
-> to `TIKTOK_POST_MODE=inbox` or `direct`. Note: manual-mode clips
-> (`*_tiktok.mp4` in the preview webroot) are left on the server so the link
-> keeps working — clean them out occasionally.
+> TikTok API is not used at all. After approval, the finished clip and a
+> ready-to-paste caption are sent to you on Telegram — save the video and post
+> it from the TikTok app. No TikTok credentials are needed in this mode;
+> everything below only applies to `TIKTOK_POST_MODE=inbox` or `direct`.
 
 ## 1. Register a Developer Account
 
@@ -68,7 +65,7 @@ and `TIKTOK_OPEN_ID` to `.env` automatically.
 ## Posting Flow (inbox mode)
 
 1. `cutter daily` uploads the approved clip to TikTok.
-2. TikTok sends you an in-app inbox notification; cutter sends the caption via WhatsApp.
+2. TikTok sends you an in-app inbox notification; cutter sends the caption via Telegram.
 3. Open the notification, paste the caption, choose visibility, and post.
 
 ## Token Refresh

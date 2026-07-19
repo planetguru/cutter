@@ -49,20 +49,9 @@ class Settings:
     instagram_access_token: str = field(default_factory=lambda: os.getenv("INSTAGRAM_ACCESS_TOKEN", ""))
     instagram_account_id: str = field(default_factory=lambda: os.getenv("INSTAGRAM_ACCOUNT_ID", ""))
 
-    # WhatsApp (Twilio)
-    twilio_account_sid: str = field(default_factory=lambda: os.getenv("TWILIO_ACCOUNT_SID", ""))
-    twilio_auth_token: str = field(default_factory=lambda: os.getenv("TWILIO_AUTH_TOKEN", ""))
-    twilio_whatsapp_from: str = field(default_factory=lambda: os.getenv("TWILIO_WHATSAPP_FROM", ""))
-    twilio_whatsapp_to: str = field(default_factory=lambda: os.getenv("TWILIO_WHATSAPP_TO", ""))
-
-    # Preview server (WhatsApp approval clip hosting)
-    preview_host: str = field(default_factory=lambda: os.getenv("PREVIEW_HOST", ""))
-    preview_user: str = field(default_factory=lambda: os.getenv("PREVIEW_USER", "root"))
-    preview_webroot: str = field(default_factory=lambda: os.getenv("PREVIEW_WEBROOT", ""))
-    preview_base_url: str = field(default_factory=lambda: os.getenv("PREVIEW_BASE_URL", ""))
-    preview_ssh_key: str = field(
-        default_factory=lambda: os.getenv("PREVIEW_SSH_KEY") or str(Path.home() / ".ssh" / "id_ed25519")
-    )
+    # Telegram (approval conversations + notifications)
+    telegram_bot_token: str = field(default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN", ""))
+    telegram_chat_id: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", ""))
 
     # YouTube
     youtube_client_id: str = field(default_factory=lambda: os.getenv("YOUTUBE_CLIENT_ID", ""))

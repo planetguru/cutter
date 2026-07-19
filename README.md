@@ -1,11 +1,11 @@
 # cutter
 
-Downloads a YouTube video, cuts it into short vertical clips, and posts them to TikTok, Instagram Reels, and YouTube Shorts — one clip per day, with optional WhatsApp approval before each post.
+Downloads a YouTube video, cuts it into short vertical clips, and posts them to TikTok, Instagram Reels, and YouTube Shorts — one clip per day, with optional Telegram approval before each post.
 
 ## How it works
 
-1. You add YouTube URLs to a queue (via the CLI or WhatsApp)
-2. Every morning at 9am, the cron job picks the next clip from the queue, sends it to you on WhatsApp as a video preview
+1. You add YouTube URLs to a queue (via the CLI or Telegram)
+2. Every morning at 9am, the cron job picks the next clip from the queue, sends it to you on Telegram as a video preview
 3. You reply **yes** to post it, **no** to skip it, or **no more today** to stop and resume tomorrow
 4. Approved clips are posted to whichever platforms you have set up
 
@@ -30,9 +30,8 @@ Fill in `.env` before running anything. Each section is only required if you're 
 | Variable | What it is |
 |---|---|
 | `ANTHROPIC_API_KEY` | Required. Used to generate captions. Get one at console.anthropic.com |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | Required for WhatsApp approval. Sign up at twilio.com |
-| `TWILIO_WHATSAPP_FROM` | Your Twilio WhatsApp sandbox number, e.g. `whatsapp:+14155238886` |
-| `TWILIO_WHATSAPP_TO` | Your personal WhatsApp number, e.g. `whatsapp:+447700900000` |
+| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather — see `docs/telegram_setup.md` |
+| `TELEGRAM_CHAT_ID` | Your chat ID — discovered by `cutter auth telegram` |
 | `PREVIEW_HOST` / `PREVIEW_USER` / `PREVIEW_WEBROOT` / `PREVIEW_BASE_URL` | SSH server where clip previews are hosted temporarily during approval |
 | `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | TikTok developer app credentials |
 | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | Meta developer app credentials |
@@ -62,7 +61,7 @@ cutter queue add "https://www.youtube.com/watch?v=..."
 cutter queue list
 ```
 
-You can also queue a video from your phone by sending a WhatsApp message to the Twilio number:
+You can also queue a video from your phone by sending your Telegram bot a message:
 
 ```
 queue:https://www.youtube.com/watch?v=...
@@ -81,7 +80,7 @@ cutter daily
 # Post to YouTube only (if TikTok/Instagram aren't set up yet)
 cutter daily --post youtube
 
-# Skip WhatsApp approval and post automatically
+# Skip Telegram approval and post automatically
 cutter daily --no-approve
 
 # Process more than one clip in a single run
@@ -91,7 +90,7 @@ cutter daily --max-clips 3    # 0 = no limit
 cutter run --url "https://www.youtube.com/watch?v=..." --post all --approve
 ```
 
-## WhatsApp approval
+## Telegram approval
 
 When a clip is ready, cutter sends two messages: a video preview, then a text prompt showing the generated captions and your reply options.
 

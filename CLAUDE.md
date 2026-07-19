@@ -21,13 +21,13 @@ pip install -e .
 
 # Daily cron entrypoint — reads queue, processes next pending video, posts to all platforms
 cutter daily
-cutter daily --no-approve   # skip WhatsApp approval, post automatically
+cutter daily --no-approve   # skip Telegram approval, post automatically
 
 # Manage the video queue
 cutter queue add "https://www.youtube.com/watch?v=..."
 cutter queue list
 
-# Queue a video via WhatsApp by sending:
+# Queue a video via Telegram by sending the bot:
 #   queue:https://www.youtube.com/watch?v=...
 # cutter daily picks these up automatically on the next run.
 
@@ -47,6 +47,7 @@ cutter reframe path/to/clip.mp4
 cutter withheld
 
 # Authenticate
+cutter auth telegram             # discover + save your Telegram chat ID
 cutter auth tiktok
 cutter auth instagram
 cutter auth instagram --refresh   # refresh 60-day token before expiry
@@ -64,15 +65,15 @@ YouTube URL
   → slicer.py       →  raw/clip_NNN.mp4              (FFmpeg stream-copy, fast)
   → reframer.py     →  reframed/clip_NNN.mp4         (FFmpeg re-encode, 9:16 blurred background)
   → captioner.py    →  captions.json                 (Claude Haiku)
-  → approver.py     →  WhatsApp conversation per clip (if --approve)
+  → approver.py     →  Telegram conversation per clip (if --approve)
   → poster/         →  TikTok / Instagram / YouTube Shorts post
 ```
 
 `pipeline.py` is the orchestrator — single entry point wiring all stages. The CLI in `cli.py` is a thin Click wrapper over `pipeline.run()`.
 
-### WhatsApp Approval Flow
+### Telegram Approval Flow
 
-When `--approve` is passed, `pipeline.py` calls `approver.approve_clip()` for each clip before posting. The approver sends a WhatsApp message via `whatsapp.WhatsAppClient` (Twilio, polling — no webhook/server needed) and loops on replies:
+When `--approve` is passed, `pipeline.py` calls `approver.approve_clip()` for each clip before posting. The approver sends the clip video + a prompt via `telegram.TelegramClient` (Bot API long-polling — no webhook/server needed) and loops on replies:
 
 - **yes** → approved, fall through to posting
 - **no** → `state.StateStore.withhold_clip()` moves the file to `{video_id}/withheld/`, updates `approval_state.json`
@@ -95,7 +96,7 @@ This means `cutter run` is idempotent: re-running the same URL resumes from wher
 - `cut_points.json` — cached detection results
 - `raw/` — stream-copied clips (deleted after reframing unless `--keep-raw`)
 - `reframed/` — final output clips
-- `withheld/` — clips you declined via WhatsApp
+- `withheld/` — clips you declined via Telegram
 - `captions.json` — Claude-generated captions
 - `../approval_state.json` — shared approval state across all videos
 
@@ -105,13 +106,13 @@ This means `cutter run` is idempotent: re-running the same URL resumes from wher
 
 **Blurred background** (`reframer.py`): FFmpeg filtergraph — source scaled up to fill 1080×1920 with `boxblur=luma_radius=30:luma_power=3` as background, original scaled-to-fit overlaid centred. Output is `libx264 -crf 23 -pix_fmt yuv420p` (required by both platforms).
 
-**TikTok** (`poster/tiktok.py` + `pipeline._manual_tiktok_handoff`): three modes via `TIKTOK_POST_MODE`. `manual` (default) skips the TikTok API entirely — the clip is scp'd to the preview server and WhatsApp sends the download link + caption for posting by hand. `inbox` uploads a draft via the API (init → chunked PUT → poll status, auto-refresh on 401) but sandbox draft notifications never arrived in testing; `direct` publishes immediately and requires a TikTok-audited production app. TikTok rejects production audits for personal/internal tools — see `docs/tiktok_oauth.md` for the full findings.
+**TikTok** (`poster/tiktok.py` + `pipeline._manual_tiktok_handoff`): three modes via `TIKTOK_POST_MODE`. `manual` (default) skips the TikTok API entirely — the clip file + caption are sent to Telegram for posting by hand. `inbox` uploads a draft via the API (init → chunked PUT → poll status, auto-refresh on 401) but sandbox draft notifications never arrived in testing; `direct` publishes immediately and requires a TikTok-audited production app. TikTok rejects production audits for personal/internal tools — see `docs/tiktok_oauth.md` for the full findings.
 
 **Instagram upload** (`poster/instagram.py`): uses Meta's resumable upload protocol — `POST /{ig-user-id}/media` with `upload_type=resumable` returns a container ID and upload URI, video bytes are POSTed directly to Meta's servers, then container is polled and published. No external storage required.
 
 **Captions** (`captioner.py`): `claude-haiku-4-5-20251001`. Returns JSON — `tiktok_caption`, `instagram_caption`, `hashtags`. Tenacity retry for malformed JSON.
 
-**WhatsApp** (`whatsapp.py`): Twilio REST client, polls `messages.list()` for inbound replies every 5 s. No webhook server required.
+**Telegram** (`telegram.py`): Bot API with `getUpdates` long-polling — no webhook or server. Sends clips as video files directly (50 MB cap). Updates are journaled to `telegram_state.json` in the workdir because Telegram only retains unread updates ~24 h. Replaced the previous Twilio WhatsApp integration, whose sandbox membership expired 72 h after the user's last message and made sends fail silently.
 
 **Config** (`config.py`): all credentials from `.env` via python-dotenv. Each platform's credentials validated lazily only when that feature is used.
 
@@ -119,6 +120,6 @@ This means `cutter run` is idempotent: re-running the same URL resumes from wher
 
 - `ffmpeg` on `PATH` — validated at startup
 - Python ≥ 3.11
-- Twilio account + WhatsApp sandbox: see `docs/whatsapp_setup.md`
+- Telegram bot: see `docs/telegram_setup.md`
 - TikTok API app: see `docs/tiktok_oauth.md`
 - Instagram Meta app: see `docs/instagram_oauth.md`

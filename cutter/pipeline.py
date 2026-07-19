@@ -14,7 +14,7 @@ from .captioner import Caption
 from .config import Settings, check_ffmpeg, get_settings
 from .poster.base import PostResult
 from .state import StateStore
-from .whatsapp import WhatsAppClient
+from .telegram import TelegramClient
 
 console = Console()
 
@@ -48,43 +48,29 @@ class ClipResult:
 def _manual_tiktok_handoff(
     clip_path: Path,
     cap: Caption | None,
-    wa: WhatsAppClient | None,
+    wa: TelegramClient | None,
     settings: Settings,
 ) -> PostResult:
-    """Upload the finished clip to the preview server and WhatsApp the link +
-    caption so the user posts it to TikTok by hand (the API is unusable for
-    unaudited personal apps)."""
-    from .approver import _upload_to_server
+    """Send the finished clip + caption to Telegram so the user posts it to
+    TikTok by hand (the API is unusable for unaudited personal apps)."""
     from .poster.tiktok import build_caption
 
-    if not settings.preview_host:
-        return PostResult(
-            platform="tiktok", clip_path=clip_path,
-            error="manual TikTok mode requires PREVIEW_HOST in .env",
-        )
     if wa is None:
         try:
-            wa = WhatsAppClient(settings)
+            wa = TelegramClient(settings)
         except Exception as e:
             return PostResult(
                 platform="tiktok", clip_path=clip_path,
-                error=f"manual TikTok mode requires WhatsApp: {e}",
+                error=f"manual TikTok mode requires Telegram: {e}",
             )
 
-    remote_name = _upload_to_server(clip_path, settings, transcode=False, remote_suffix="_tiktok")
-    if not remote_name:
-        return PostResult(
-            platform="tiktok", clip_path=clip_path,
-            error="upload to preview server failed",
-        )
-    url = f"{settings.preview_base_url}/{remote_name}"
+    wa.send_video(clip_path)
     wa.send(
-        "📱 *TikTok — post this one manually*\n"
-        f"Download the clip: {url}\n\n"
-        "Caption to paste:\n\n"
+        "📱 *TikTok — post this one manually*\n\n"
+        "Save the video above, then paste this caption:\n\n"
         f"{build_caption(cap, clip_path)}"
     )
-    return PostResult(platform="tiktok", clip_path=clip_path, url=url)
+    return PostResult(platform="tiktok", clip_path=clip_path)
 
 
 def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
@@ -162,10 +148,10 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
         pending_clips = pending_clips[: options.max_clips]
     reframed_dir = options.workdir / asset.video_id / "reframed"
 
-    # WhatsApp client (only if approval mode)
-    wa: WhatsAppClient | None = None
+    # Telegram client (only if approval mode)
+    wa: TelegramClient | None = None
     if options.approve:
-        wa = WhatsAppClient(settings)
+        wa = TelegramClient(settings)
 
     results: list[ClipResult] = []
     total = len(pending_clips)
@@ -175,7 +161,7 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
 
         # --- Approval gate ---
         if options.approve and wa is not None and cap is not None:
-            result = approve_clip(wa, clip_path, cap, i, total, settings)
+            result = approve_clip(wa, clip_path, cap, i, total)
             cap = result.caption  # may have been edited
 
             if result.decision == Decision.WITHHELD:
