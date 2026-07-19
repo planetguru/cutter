@@ -45,6 +45,48 @@ class ClipResult:
     skipped_today: bool = False
 
 
+def _manual_tiktok_handoff(
+    clip_path: Path,
+    cap: Caption | None,
+    wa: WhatsAppClient | None,
+    settings: Settings,
+) -> PostResult:
+    """Upload the finished clip to the preview server and WhatsApp the link +
+    caption so the user posts it to TikTok by hand (the API is unusable for
+    unaudited personal apps)."""
+    from .approver import _upload_to_server
+    from .poster.tiktok import build_caption
+
+    if not settings.preview_host:
+        return PostResult(
+            platform="tiktok", clip_path=clip_path,
+            error="manual TikTok mode requires PREVIEW_HOST in .env",
+        )
+    if wa is None:
+        try:
+            wa = WhatsAppClient(settings)
+        except Exception as e:
+            return PostResult(
+                platform="tiktok", clip_path=clip_path,
+                error=f"manual TikTok mode requires WhatsApp: {e}",
+            )
+
+    remote_name = _upload_to_server(clip_path, settings, transcode=False, remote_suffix="_tiktok")
+    if not remote_name:
+        return PostResult(
+            platform="tiktok", clip_path=clip_path,
+            error="upload to preview server failed",
+        )
+    url = f"{settings.preview_base_url}/{remote_name}"
+    wa.send(
+        "📱 *TikTok — post this one manually*\n"
+        f"Download the clip: {url}\n\n"
+        "Caption to paste:\n\n"
+        f"{build_caption(cap, clip_path)}"
+    )
+    return PostResult(platform="tiktok", clip_path=clip_path, url=url)
+
+
 def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
     if options is None:
         options = PipelineOptions()
@@ -52,8 +94,8 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
     check_ffmpeg()
     settings = get_settings()
 
-    # Validate posting credentials early
-    if options.post in ("tiktok", "both", "all"):
+    # Validate posting credentials early (manual TikTok mode needs no API creds)
+    if options.post in ("tiktok", "both", "all") and settings.tiktok_post_mode != "manual":
         settings.require_tiktok()
     if options.post in ("instagram", "both", "all"):
         settings.require_instagram()
@@ -159,8 +201,11 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
         clip_result = ClipResult(clip_path=clip_path, caption=cap)
 
         if options.post in ("tiktok", "both", "all"):
-            from .poster.tiktok import TikTokPoster
-            post_result = TikTokPoster(settings).post(clip_path, cap)
+            if settings.tiktok_post_mode == "manual":
+                post_result = _manual_tiktok_handoff(clip_path, cap, wa, settings)
+            else:
+                from .poster.tiktok import TikTokPoster
+                post_result = TikTokPoster(settings).post(clip_path, cap)
             clip_result.post_results.append(post_result)
 
         if options.post in ("instagram", "both", "all"):
@@ -180,10 +225,15 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
         # Notify via WhatsApp when posting succeeds
         if wa is not None and clip_result.post_results:
             successes = [r for r in clip_result.post_results if r.success]
-            if successes:
-                platforms = " & ".join(r.platform.title() for r in successes)
+            # Manual TikTok hand-off announces itself with the download link.
+            announce = [
+                r for r in successes
+                if not (r.platform == "tiktok" and settings.tiktok_post_mode == "manual")
+            ]
+            if announce:
+                platforms = " & ".join(r.platform.title() for r in announce)
                 wa.send(f"🚀 Clip {i}/{total} posted to {platforms}!")
-            tiktok_inbox = settings.tiktok_post_mode != "direct" and any(
+            tiktok_inbox = settings.tiktok_post_mode == "inbox" and any(
                 r.platform == "tiktok" for r in successes
             )
             if tiktok_inbox:

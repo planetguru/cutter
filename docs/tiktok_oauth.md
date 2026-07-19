@@ -3,19 +3,23 @@
 > **Important:** TikTok does not approve production API access for personal or
 > internal-use apps — a production audit submission will be rejected with
 > "TikTok for Developers currently does not support personal or internal company
-> use." For a personal tool like cutter, the supported route is **sandbox mode**,
-> which restricts what the API can do:
+> use." The suggested alternative, sandbox mode, proved unusable in practice
+> (tested July 2026):
 >
-> - Only TikTok accounts added as sandbox **target users** can authenticate.
-> - Content posted by unaudited apps is forced to private (`SELF_ONLY`)
->   visibility when using Direct Post.
+> - **Inbox uploads** return `SEND_TO_USER_INBOX` but the draft notification
+>   never arrives in the TikTok app.
+> - **Direct post** from an unaudited app fails with
+>   `unaudited_client_can_only_post_to_private_accounts` unless the whole
+>   account is private, and is forced to `SELF_ONLY` visibility regardless.
 >
-> cutter therefore defaults to **inbox upload mode** (`TIKTOK_POST_MODE=inbox`):
-> the clip is uploaded to your TikTok inbox as a draft, you get an in-app
-> notification, and you publish it through TikTok's normal creation flow — where
-> public visibility is still available. The caption is sent to you on WhatsApp
-> to paste in. Set `TIKTOK_POST_MODE=direct` only if the app ever passes
-> TikTok's audit.
+> cutter therefore defaults to **manual mode** (`TIKTOK_POST_MODE=manual`): the
+> TikTok API is not used at all. After approval, the finished clip is uploaded
+> to the preview server (`PREVIEW_HOST` etc. in `.env`) and WhatsApp sends you
+> the download link plus the ready-to-paste caption — you post from the phone.
+> No TikTok credentials are needed in this mode; everything below only applies
+> to `TIKTOK_POST_MODE=inbox` or `direct`. Note: manual-mode clips
+> (`*_tiktok.mp4` in the preview webroot) are left on the server so the link
+> keeps working — clean them out occasionally.
 
 ## 1. Register a Developer Account
 

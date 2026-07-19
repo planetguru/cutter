@@ -205,39 +205,49 @@ def _build_edit_ack(field_name: str, new_value: str, clip_index: int, total_clip
 
 
 
-def _upload_to_server(clip_path: Path, settings: Settings) -> str | None:
+def _upload_to_server(
+    clip_path: Path,
+    settings: Settings,
+    *,
+    transcode: bool = True,
+    remote_suffix: str = "_preview",
+) -> str | None:
     """
-    Compress clip to 540x960 and SCP to the configured preview server.
+    SCP a clip to the configured preview server, compressed to 540x960 by
+    default (WhatsApp media cap) or as-is with transcode=False.
     Returns the remote filename (not full URL), or None on failure.
     """
-    remote_name = f"{clip_path.stem}_preview.mp4"
+    remote_name = f"{clip_path.stem}{remote_suffix}.mp4"
     ssh_key = str(Path(settings.preview_ssh_key).expanduser())
     dest = f"{settings.preview_user}@{settings.preview_host}:{settings.preview_webroot}/{remote_name}"
 
-    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
-        preview_path = Path(tmp.name)
+    preview_path = clip_path
+    if transcode:
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+            preview_path = Path(tmp.name)
 
     try:
-        # 540x960 half-res 9:16, CRF 30 — ~3-6 MB for a 30-55s clip
-        result = subprocess.run(
-            [
-                "ffmpeg", "-i", str(clip_path),
-                "-vf", "scale=540:960",
-                "-c:v", "libx264", "-preset", "fast", "-crf", "30",
-                "-c:a", "aac", "-b:a", "96k",
-                "-movflags", "+faststart",
-                "-y", str(preview_path),
-            ],
-            capture_output=True,
-        )
-        if result.returncode != 0 or not preview_path.exists():
-            print("[approver] ffmpeg preview encode failed")
-            return None
+        if transcode:
+            # 540x960 half-res 9:16, CRF 30 — ~3-6 MB for a 30-55s clip
+            result = subprocess.run(
+                [
+                    "ffmpeg", "-i", str(clip_path),
+                    "-vf", "scale=540:960",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "30",
+                    "-c:a", "aac", "-b:a", "96k",
+                    "-movflags", "+faststart",
+                    "-y", str(preview_path),
+                ],
+                capture_output=True,
+            )
+            if result.returncode != 0 or not preview_path.exists():
+                print("[approver] ffmpeg preview encode failed")
+                return None
 
-        size_mb = preview_path.stat().st_size / 1_048_576
-        if size_mb > 15.5:
-            print(f"[approver] preview too large ({size_mb:.1f} MB), skipping video attachment")
-            return None
+            size_mb = preview_path.stat().st_size / 1_048_576
+            if size_mb > 15.5:
+                print(f"[approver] preview too large ({size_mb:.1f} MB), skipping video attachment")
+                return None
 
         scp_result = subprocess.run(
             ["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
@@ -264,7 +274,8 @@ def _upload_to_server(clip_path: Path, settings: Settings) -> str | None:
         print(f"[approver] upload failed: {e}")
         return None
     finally:
-        preview_path.unlink(missing_ok=True)
+        if transcode:
+            preview_path.unlink(missing_ok=True)
 
 
 def _delete_from_server(remote_name: str, settings: Settings) -> None:
