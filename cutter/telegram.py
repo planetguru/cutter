@@ -47,7 +47,17 @@ class TelegramClient:
                 caption=body[:1024] or None,
             )
         else:
-            result = self._api("sendMessage", chat_id=self._chat_id, text=body)
+            # Prompts use *bold*/_italic_ markers; render them, but fall back
+            # to plain text when user-supplied content breaks entity parsing
+            # (e.g. an unbalanced underscore in a caption).
+            try:
+                result = self._api(
+                    "sendMessage", chat_id=self._chat_id, text=body, parse_mode="Markdown"
+                )
+            except TelegramError as e:
+                if "parse" not in str(e).lower():
+                    raise
+                result = self._api("sendMessage", chat_id=self._chat_id, text=body)
         return datetime.fromtimestamp(result["date"], tz=timezone.utc)
 
     def send_video(self, path: Path, caption: str = "") -> datetime:

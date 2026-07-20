@@ -75,6 +75,15 @@ class InstagramPoster:
         if not (s.media_host and s.media_webroot and s.media_base_url):
             raise InstagramError("MEDIA_HOST/MEDIA_WEBROOT/MEDIA_BASE_URL must be set in .env")
         remote_name = f"{clip_path.stem}_{secrets.token_hex(4)}_ig.mp4"
+
+        if s.media_host == "local":
+            # cutter runs on the web server itself — plain copy into the webroot.
+            import shutil
+            dest_path = Path(s.media_webroot) / remote_name
+            shutil.copyfile(clip_path, dest_path)
+            dest_path.chmod(0o644)
+            return remote_name, f"{s.media_base_url}/{remote_name}"
+
         ssh_key = str(Path(s.media_ssh_key).expanduser())
         dest = f"{s.media_user}@{s.media_host}:{s.media_webroot}/{remote_name}"
         result = subprocess.run(
@@ -93,6 +102,9 @@ class InstagramPoster:
 
     def _unstage_media(self, remote_name: str) -> None:
         s = self.settings
+        if s.media_host == "local":
+            (Path(s.media_webroot) / remote_name).unlink(missing_ok=True)
+            return
         ssh_key = str(Path(s.media_ssh_key).expanduser())
         try:
             subprocess.run(
