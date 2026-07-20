@@ -405,6 +405,21 @@ def queue_list() -> None:
 
 
 # ---------------------------------------------------------------------------
+# cutter assistant
+# ---------------------------------------------------------------------------
+
+@main.command()
+def assistant() -> None:
+    """Run the read-only Telegram Q&A assistant (long-lived; for systemd)."""
+    from .assistant import run_assistant
+
+    try:
+        run_assistant()
+    except KeyboardInterrupt:
+        console.print("[dim]assistant stopped.[/dim]")
+
+
+# ---------------------------------------------------------------------------
 # cutter daily
 # ---------------------------------------------------------------------------
 

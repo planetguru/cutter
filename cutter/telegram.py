@@ -99,6 +99,12 @@ class TelegramClient:
                     return msg["text"].strip()
         return None
 
+    def poll_new_messages(self, long_poll: bool = True) -> list[dict]:
+        """Return user messages that have arrived since the last poll (drains
+        them into the journal, advancing the offset). Each item is
+        {"date": int, "text": str}."""
+        return self._fetch_updates(long_poll=long_poll)
+
     def scan_queue_messages(self, since: datetime | None = None) -> list[str]:
         """Return YouTube URLs from 'queue:...' messages received since `since`."""
         since = _default_since(since, days=7)
