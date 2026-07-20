@@ -88,7 +88,7 @@ def reset() -> None:
 
 @main.command()
 @click.option("--url", required=True, help="YouTube video URL")
-@click.option("--post", default="none", type=click.Choice(["tiktok", "instagram", "youtube", "both", "all", "none"]), show_default=True, help="Platform(s) to post to: tiktok, instagram, youtube, both (tiktok+instagram), all (all three), or none")
+@click.option("--post", default="none", type=click.Choice(["tiktok", "instagram", "youtube", "facebook", "both", "all", "none"]), show_default=True, help="Platform(s) to post to: tiktok, instagram, youtube, both (tiktok+instagram), all (all three), or none")
 @click.option("--approve/--no-approve", default=False, help="Ask for Telegram approval before each post")
 @click.option("--reframe", default="blur", type=click.Choice(["blur", "rotate"]), show_default=True,
               help="9:16 mode: blur (landscape on blurred background) or rotate (90° full-screen)")
@@ -154,6 +154,7 @@ def run_cmd(
     table.add_column("TikTok")
     table.add_column("Instagram")
     table.add_column("YouTube")
+    table.add_column("Facebook")
 
     for i, r in enumerate(results, 1):
         if r.withheld:
@@ -166,7 +167,8 @@ def run_cmd(
         tiktok_col = _post_status(r.post_results, "tiktok")
         instagram_col = _post_status(r.post_results, "instagram")
         youtube_col = _post_status(r.post_results, "youtube")
-        table.add_row(str(i), r.clip_path.name, status, tiktok_col, instagram_col, youtube_col)
+        facebook_col = _post_status(r.post_results, "facebook")
+        table.add_row(str(i), r.clip_path.name, status, tiktok_col, instagram_col, youtube_col, facebook_col)
 
     console.print(table)
 
@@ -344,6 +346,19 @@ def telegram() -> None:
 
 
 @auth.command()
+def facebook() -> None:
+    """Run Facebook Login and save the Page token for Reels posting."""
+    from .poster.facebook import FacebookError, run_oauth_flow
+
+    settings = get_settings()
+    try:
+        run_oauth_flow(settings)
+    except FacebookError as e:
+        console.print(f"[red]Facebook auth error:[/red] {e}")
+        raise SystemExit(1)
+
+
+@auth.command()
 def youtube() -> None:
     """Run YouTube OAuth flow and save tokens to .env."""
     from .poster.youtube import YouTubeError, run_oauth_flow
@@ -433,7 +448,7 @@ def assistant() -> None:
 
 @main.command()
 @click.option("--post", default="all",
-              type=click.Choice(["tiktok", "instagram", "youtube", "both", "all", "none"]),
+              type=click.Choice(["tiktok", "instagram", "youtube", "facebook", "both", "all", "none"]),
               show_default=True)
 @click.option("--approve/--no-approve", default=True,
               help="Ask for Telegram approval before posting (default: on)")

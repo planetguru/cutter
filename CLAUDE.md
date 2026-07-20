@@ -51,6 +51,7 @@ cutter withheld
 cutter auth telegram             # discover + save your Telegram chat ID
 cutter auth tiktok
 cutter auth instagram
+cutter auth facebook              # Facebook Login → Page token for Reels
 cutter auth instagram --refresh   # refresh 60-day token before expiry
 cutter auth youtube               # shows channel name so you can confirm the right one
 ```
@@ -110,6 +111,8 @@ This means `cutter run` is idempotent: re-running the same URL resumes from wher
 **TikTok** (`poster/tiktok.py` + `pipeline._manual_tiktok_handoff`): three modes via `TIKTOK_POST_MODE`. `manual` (default) skips the TikTok API entirely — the clip file + caption are sent to Telegram for posting by hand. `inbox` uploads a draft via the API (init → chunked PUT → poll status, auto-refresh on 401) but sandbox draft notifications never arrived in testing; `direct` publishes immediately and requires a TikTok-audited production app. TikTok rejects production audits for personal/internal tools — see `docs/tiktok_oauth.md` for the full findings.
 
 **Instagram upload** (`poster/instagram.py`): uses the **Instagram API with Instagram login** (graph.instagram.com) — no Facebook Page required (Meta has disabled Page↔IG linking for many accounts, killing the old Facebook-Login flavour). This API ingests from a public URL only, so the clip is scp'd to the media staging server (`MEDIA_*` in `.env`) → `POST /{ig-id}/media` with `media_type=REELS&video_url=…` → poll container → publish → staged file deleted. OAuth needs an HTTPS redirect: `https://cutter.chris.uk.com/instagram/callback` bounces to localhost:8080 (same trick as TikTok).
+
+**Facebook Reels** (`poster/facebook.py`): posts to a Facebook **Page** via the Graph API `video_reels` endpoint (3-phase: start → upload bytes to `rupload.facebook.com` → finish/publish). Needs a Page access token from `cutter auth facebook` (Facebook Login → long-lived user token → Page token via `/me/accounts`; Page tokens don't expire). Uses the main Meta app creds (`FACEBOOK_APP_ID/SECRET`), distinct from the Instagram-Login app. Included in `--post all`; requires a Page you administer (App Review only needed for others' Pages).
 
 **Captions** (`captioner.py`): `claude-haiku-4-5-20251001`. Returns JSON — `tiktok_caption`, `instagram_caption`, `hashtags`. Tenacity retry for malformed JSON.
 

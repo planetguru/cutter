@@ -43,6 +43,13 @@ class Settings:
         default_factory=lambda: os.getenv("TIKTOK_REDIRECT_URI", "http://localhost:8080/callback")
     )
 
+    # Facebook Reels (posts to a Facebook Page via the main Meta app + Facebook Login)
+    facebook_app_id: str = field(default_factory=lambda: os.getenv("FACEBOOK_APP_ID", ""))
+    facebook_app_secret: str = field(default_factory=lambda: os.getenv("FACEBOOK_APP_SECRET", ""))
+    facebook_page_id: str = field(default_factory=lambda: os.getenv("FACEBOOK_PAGE_ID", ""))
+    facebook_page_token: str = field(default_factory=lambda: os.getenv("FACEBOOK_PAGE_TOKEN", ""))
+    facebook_page_name: str = field(default_factory=lambda: os.getenv("FACEBOOK_PAGE_NAME", ""))
+
     # Instagram / Meta
     instagram_app_id: str = field(default_factory=lambda: os.getenv("INSTAGRAM_APP_ID", ""))
     instagram_app_secret: str = field(default_factory=lambda: os.getenv("INSTAGRAM_APP_SECRET", ""))
@@ -100,6 +107,16 @@ class Settings:
         if missing:
             raise ConfigError(
                 f"Instagram credentials missing: {', '.join(missing).upper()}. Run: cutter auth instagram"
+            )
+
+    def require_facebook(self) -> None:
+        missing = [
+            k for k in ("facebook_app_id", "facebook_app_secret", "facebook_page_id", "facebook_page_token")
+            if not getattr(self, k)
+        ]
+        if missing:
+            raise ConfigError(
+                f"Facebook credentials missing: {', '.join(missing).upper()}. Run: cutter auth facebook"
             )
 
     def require_youtube(self) -> None:

@@ -84,7 +84,7 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
     # Resolve target platforms, skipping any without credentials so a single
     # unconfigured platform doesn't sink the whole daily run.
     requested = {
-        "all": {"tiktok", "instagram", "youtube"},
+        "all": {"tiktok", "instagram", "youtube", "facebook"},
         "both": {"tiktok", "instagram"},
         "none": set(),
     }.get(options.post, {options.post})
@@ -97,6 +97,8 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
                 settings.require_instagram()
             elif platform == "youtube":
                 settings.require_youtube()
+            elif platform == "facebook":
+                settings.require_facebook()
             platforms.add(platform)
         except ConfigError as e:
             console.print(f"[yellow]Skipping {platform} (not configured): {e}[/yellow]")
@@ -220,6 +222,11 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
         if "youtube" in platforms:
             from .poster.youtube import YouTubePoster
             post_result = YouTubePoster(settings).post(clip_path, cap)
+            clip_result.post_results.append(post_result)
+
+        if "facebook" in platforms:
+            from .poster.facebook import FacebookPoster
+            post_result = FacebookPoster(settings).post(clip_path, cap)
             clip_result.post_results.append(post_result)
 
         # Only mark posted when something was actually sent to a platform
