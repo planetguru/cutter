@@ -124,14 +124,22 @@ class TelegramClient:
     # -- internals ----------------------------------------------------------
 
     def _api(self, method: str, *, http_timeout: int = 30, **params) -> dict:
-        try:
-            resp = requests.post(f"{self._base}/{method}", json=params, timeout=http_timeout)
-            payload = resp.json()
-        except Exception as e:
-            raise TelegramError(f"{method} request failed: {e}") from e
-        if not payload.get("ok"):
-            raise TelegramError(f"{method} failed: {payload.get('description', resp.text[:200])}")
-        return payload["result"]
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                resp = requests.post(f"{self._base}/{method}", json=params, timeout=http_timeout)
+                payload = resp.json()
+            except requests.exceptions.RequestException as e:
+                # Transient network error (e.g. connection reset) — back off and retry.
+                last_exc = e
+                time.sleep(2 * (attempt + 1))
+                continue
+            except Exception as e:
+                raise TelegramError(f"{method} request failed: {e}") from e
+            if not payload.get("ok"):
+                raise TelegramError(f"{method} failed: {payload.get('description', resp.text[:200])}")
+            return payload["result"]
+        raise TelegramError(f"{method} request failed after retries: {last_exc}") from last_exc
 
     def _fetch_updates(self, long_poll: bool = False) -> list[dict]:
         """Drain pending updates into the journal; return new messages from the user."""
