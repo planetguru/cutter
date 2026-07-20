@@ -26,7 +26,8 @@ class PipelineOptions:
     scene_threshold: float = 12.0
     silence_db: float = -40.0
     post: str = "none"          # "tiktok" | "instagram" | "youtube" | "both" | "all" | "none"
-    approve: bool = False       # require WhatsApp approval before posting
+    reframe: str = "blur"       # "blur" (9:16 blurred background) or "rotate" (90° fill)
+    approve: bool = False       # require Telegram approval before posting
     captions: bool = True
     keep_raw: bool = False
     force: bool = False
@@ -130,8 +131,11 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
         )
 
     # Reframe to 9:16
-    with console.status("Reframing to 9:16…"):
-        final_clips = reframer.reframe_all(raw_clips, options.workdir, asset.video_id)
+    label = "Rotating to fill 9:16…" if options.reframe == "rotate" else "Reframing to 9:16…"
+    with console.status(label):
+        final_clips = reframer.reframe_all(
+            raw_clips, options.workdir, asset.video_id, mode=options.reframe
+        )
 
     # Generate captions
     captions_cache = options.workdir / asset.video_id / "captions.json"

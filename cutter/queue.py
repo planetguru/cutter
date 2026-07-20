@@ -21,6 +21,7 @@ class QueueItem:
     status: QueueStatus = "pending"
     added: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     used: str | None = None
+    reframe: str = "blur"   # "blur" (9:16 blurred background) or "rotate" (90° fill)
 
 
 @dataclass
@@ -50,21 +51,27 @@ def _save(qf: QueueFile) -> None:
     QUEUE_PATH.write_text(json.dumps(data, indent=2))
 
 
-def add(url: str) -> bool:
+def add(url: str, reframe: str = "blur") -> bool:
     """Add a URL to the queue. Returns False if already present (pending or used)."""
     qf = _load()
     if any(i.url == url for i in qf.items):
         return False
-    qf.items.append(QueueItem(url=url))
+    qf.items.append(QueueItem(url=url, reframe=reframe))
     _save(qf)
     return True
 
 
 def next_pending() -> str | None:
     """Return the next pending URL, or None if the queue is empty."""
+    item = next_pending_item()
+    return item.url if item else None
+
+
+def next_pending_item() -> QueueItem | None:
+    """Return the next pending QueueItem (carries the reframe mode), or None."""
     for item in _load().items:
         if item.status == "pending":
-            return item.url
+            return item
     return None
 
 

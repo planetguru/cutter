@@ -32,7 +32,8 @@ The conversation commands:
 
 - approval replies: `yes` / `no` / `no more today`, edits via `title:` /
   `desc:` / `tiktok:` / `instagram:` / `tags:`
-- `queue:https://www.youtube.com/watch?v=...` to queue a video
+- `queue:https://www.youtube.com/watch?v=...` to queue a video (normal 9:16 cut)
+- `queuev:https://www.youtube.com/watch?v=...` to queue a video rotated 90° to fill the screen (viewer turns their phone) — good for intricate landscape visuals
 - `reset` to wipe state on the next daily run
 
 The TikTok manual hand-off sends the full-quality clip file into the chat

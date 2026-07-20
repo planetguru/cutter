@@ -70,10 +70,14 @@ def run_assistant() -> None:
             if not text:
                 continue
             low = text.lower()
-            # queue: commands are actioned immediately so the queue reflects them
-            # right away (dedup means the 9am daily scan won't re-add them).
+            # queue:/queuev: commands are actioned immediately so the queue
+            # reflects them right away (dedup means the 9am daily scan won't
+            # re-add them). queuev: marks the video for rotate (90° fill) mode.
+            if low.startswith("queuev:"):
+                _handle_queue(tg, text, len("queuev:"), "rotate")
+                continue
             if low.startswith("queue:"):
-                _handle_queue(tg, text)
+                _handle_queue(tg, text, len("queue:"), "blur")
                 continue
             # `reset` is destructive — leave it for `cutter daily` to handle.
             if low == "reset":
@@ -87,23 +91,26 @@ def run_assistant() -> None:
             tg.send(answer[:3900])
 
 
-def _handle_queue(tg: TelegramClient, text: str) -> None:
-    """Add a `queue:<url>` command to the video queue immediately."""
+def _handle_queue(tg: TelegramClient, text: str, prefix_len: int, reframe: str) -> None:
+    """Add a queue:/queuev: command to the video queue immediately."""
     from . import queue as q
 
-    url = text[len("queue:"):].strip().strip("'\"'‘’“”")
+    url = text[prefix_len:].strip().strip("'\"'‘’“”")
     if not url:
-        tg.send("Send a URL after queue: — e.g. queue:https://youtu.be/…")
+        tg.send("Send a URL after the command — e.g. queue:https://youtu.be/… "
+                "(or queuev: for a rotated, full-screen cut).")
         return
     try:
-        added = q.add(url)
+        added = q.add(url, reframe=reframe)
     except Exception as e:
         print(f"[assistant] queue add error: {e}", flush=True)
         tg.send(f"Couldn't add that to the queue: {e}")
         return
+    mode_note = " (rotated 90° to fill the screen)" if reframe == "rotate" else ""
     if added:
-        print(f"[assistant] queued: {url}", flush=True)
-        tg.send(f"✅ Added to the queue: {url}\nIt'll be processed on the next daily run (9am UK).")
+        print(f"[assistant] queued ({reframe}): {url}", flush=True)
+        tg.send(f"✅ Added to the queue{mode_note}: {url}\n"
+                "It'll be processed on the next daily run (9am UK).")
     else:
         tg.send(f"That URL is already in the queue: {url}")
 

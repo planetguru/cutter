@@ -90,6 +90,8 @@ def reset() -> None:
 @click.option("--url", required=True, help="YouTube video URL")
 @click.option("--post", default="none", type=click.Choice(["tiktok", "instagram", "youtube", "both", "all", "none"]), show_default=True, help="Platform(s) to post to: tiktok, instagram, youtube, both (tiktok+instagram), all (all three), or none")
 @click.option("--approve/--no-approve", default=False, help="Ask for Telegram approval before each post")
+@click.option("--reframe", default="blur", type=click.Choice(["blur", "rotate"]), show_default=True,
+              help="9:16 mode: blur (landscape on blurred background) or rotate (90° full-screen)")
 @click.option("--min-clip", default=25, show_default=True, help="Minimum clip length in seconds")
 @click.option("--max-clip", default=55, show_default=True, help="Maximum clip length in seconds")
 @click.option("--scene-threshold", default=12.0, show_default=True, help="scdet threshold (0–100)")
@@ -102,6 +104,7 @@ def run_cmd(
     url: str,
     post: str,
     approve: bool,
+    reframe: str,
     min_clip: int,
     max_clip: int,
     scene_threshold: float,
@@ -125,6 +128,7 @@ def run_cmd(
         silence_db=silence_db,
         post=post,
         approve=approve,
+        reframe=reframe,
         captions=not no_captions,
         keep_raw=keep_raw,
         force=force,
@@ -363,12 +367,14 @@ def queue() -> None:
 
 @queue.command(name="add")
 @click.argument("url")
-def queue_add(url: str) -> None:
+@click.option("--reframe", default="blur", type=click.Choice(["blur", "rotate"]), show_default=True,
+              help="9:16 mode: blur (landscape on blurred background) or rotate (90° full-screen)")
+def queue_add(url: str, reframe: str) -> None:
     """Add a YouTube URL to the processing queue."""
     from . import queue as q
 
-    if q.add(url):
-        console.print(f"[green]Queued:[/green] {url}")
+    if q.add(url, reframe=reframe):
+        console.print(f"[green]Queued:[/green] {url} [dim]({reframe})[/dim]")
     else:
         console.print(f"[yellow]Already in queue:[/yellow] {url}")
 
@@ -386,6 +392,7 @@ def queue_list() -> None:
     table = Table(title="Video queue")
     table.add_column("Status")
     table.add_column("URL")
+    table.add_column("Mode")
     table.add_column("Added")
     table.add_column("Used")
 
@@ -396,7 +403,8 @@ def queue_list() -> None:
             status = "[dim]used[/dim]"
         added = item.added[:10]
         used = item.used[:10] if item.used else "—"
-        table.add_row(status, item.url, added, used)
+        mode = getattr(item, "reframe", "blur")
+        table.add_row(status, item.url, mode, added, used)
 
     console.print(table)
 
@@ -491,9 +499,9 @@ def daily(post: str, approve: bool, max_clips: int) -> None:
                     deleted += 1
             # Pick up any queue: messages sent after the reset message
             post_reset_urls = wa.scan_queue_messages(since=reset_at)
-            for url in post_reset_urls:
-                if q.add(url):
-                    console.print(f"[dim]Queued from message (post-reset): {url}[/dim]")
+            for url, reframe in post_reset_urls:
+                if q.add(url, reframe=reframe):
+                    console.print(f"[dim]Queued from message (post-reset): {url} ({reframe})[/dim]")
             reply = "Reset complete. Cleared queue and {} video folder(s).".format(deleted)
             if post_reset_urls:
                 reply += " Picked up {} queued URL(s) sent after the reset.".format(len(post_reset_urls))
@@ -505,22 +513,24 @@ def daily(post: str, approve: bool, max_clips: int) -> None:
 
         new_urls = wa.scan_queue_messages(since=since)
         q.update_last_message_scan()
-        for url in new_urls:
-            if q.add(url):
-                console.print(f"[dim]Queued from message: {url}[/dim]")
+        for url, reframe in new_urls:
+            if q.add(url, reframe=reframe):
+                console.print(f"[dim]Queued from message: {url} ({reframe})[/dim]")
     except Exception:
         pass
 
-    url = q.next_pending()
-    if url is None:
+    item = q.next_pending_item()
+    if item is None:
         console.print("[dim]Queue is empty — nothing to post today.[/dim]")
         return
+    url = item.url
 
-    console.print(f"Processing: {url}")
+    console.print(f"Processing: {url} (reframe: {item.reframe})")
 
     options = PipelineOptions(
         post=post,
         approve=approve,
+        reframe=item.reframe,
         workdir=workdir,
         max_clips=None if max_clips == 0 else max_clips,
     )

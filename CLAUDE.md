@@ -28,8 +28,9 @@ cutter queue add "https://www.youtube.com/watch?v=..."
 cutter queue list
 
 # Queue a video via Telegram by sending the bot:
-#   queue:https://www.youtube.com/watch?v=...
-# cutter daily picks these up automatically on the next run.
+#   queue:https://www.youtube.com/watch?v=...    (normal 9:16 blurred-background cut)
+#   queuev:https://www.youtube.com/watch?v=...   (rotated 90° to fill the screen)
+# The assistant actions these instantly; cutter daily also picks them up on its next run.
 
 # One-off pipeline (bypasses the queue)
 cutter run --url "https://www.youtube.com/watch?v=..." --post all --approve
@@ -104,7 +105,7 @@ This means `cutter run` is idempotent: re-running the same URL resumes from wher
 
 **Scene + silence detection** (`detector.py`): two FFmpeg passes — `scdet=t=12` for visual cuts, `silencedetect=n=-40dB:d=0.5` for audio gaps. Silence midpoints are preferred over scene times when within 2 s. Segments enforced to `[min_clip, max_clip]`.
 
-**Blurred background** (`reframer.py`): FFmpeg filtergraph — source scaled up to fill 1080×1920 with `boxblur=luma_radius=30:luma_power=3` as background, original scaled-to-fit overlaid centred. Output is `libx264 -crf 23 -pix_fmt yuv420p` (required by both platforms).
+**Reframing** (`reframer.py`): two modes selected per-video by the queue item's `reframe` field (threaded via `PipelineOptions.reframe`). `blur` (default) — source scaled up to fill 1080×1920 with `boxblur=luma_radius=30:luma_power=3` as background, original scaled-to-fit overlaid centred. `rotate` — `transpose=1` spins the landscape frame 90° (clockwise) then scale-to-fill+crop so it fills 1080×1920 edge-to-edge (viewer turns their phone); a 16:9 source maps to exactly 9:16 with no crop. Both output `libx264 -crf 23 -pix_fmt yuv420p`. Queue `rotate` via the `queuev:` Telegram command or `--reframe rotate`.
 
 **TikTok** (`poster/tiktok.py` + `pipeline._manual_tiktok_handoff`): three modes via `TIKTOK_POST_MODE`. `manual` (default) skips the TikTok API entirely — the clip file + caption are sent to Telegram for posting by hand. `inbox` uploads a draft via the API (init → chunked PUT → poll status, auto-refresh on 401) but sandbox draft notifications never arrived in testing; `direct` publishes immediately and requires a TikTok-audited production app. TikTok rejects production audits for personal/internal tools — see `docs/tiktok_oauth.md` for the full findings.
 

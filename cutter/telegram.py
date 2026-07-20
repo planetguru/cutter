@@ -105,17 +105,26 @@ class TelegramClient:
         {"date": int, "text": str}."""
         return self._fetch_updates(long_poll=long_poll)
 
-    def scan_queue_messages(self, since: datetime | None = None) -> list[str]:
-        """Return YouTube URLs from 'queue:...' messages received since `since`."""
+    def scan_queue_messages(self, since: datetime | None = None) -> list[tuple[str, str]]:
+        """Return (url, reframe_mode) pairs from queue:/queuev: messages since `since`.
+
+        queue: → "blur"; queuev: → "rotate" (90° full-screen).
+        """
         since = _default_since(since, days=7)
-        urls: list[str] = []
+        out: list[tuple[str, str]] = []
         for msg in self._journal_since(since):
             body = msg["text"].strip()
-            if body.lower().startswith("queue:"):
-                url = body[6:].strip().strip("'\"'‘’“”")
-                if url:
-                    urls.append(url)
-        return urls
+            low = body.lower()
+            if low.startswith("queuev:"):
+                url, mode = body[len("queuev:"):], "rotate"
+            elif low.startswith("queue:"):
+                url, mode = body[len("queue:"):], "blur"
+            else:
+                continue
+            url = url.strip().strip("'\"'‘’“”")
+            if url:
+                out.append((url, mode))
+        return out
 
     def scan_for_reset(self, since: datetime | None = None) -> datetime | None:
         """Return the timestamp of the earliest 'reset' message since `since`."""
