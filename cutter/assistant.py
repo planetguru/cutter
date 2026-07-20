@@ -71,6 +71,7 @@ def run_assistant() -> None:
             # Leave control commands for `cutter daily` to pick up from the journal.
             if low.startswith("queue:") or low == "reset":
                 continue
+            print(f"[assistant] answering: {text[:60]!r}", flush=True)
             try:
                 answer = _answer(client, model, claude_md, text)
             except Exception as e:
