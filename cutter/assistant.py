@@ -31,10 +31,12 @@ ASSISTANT_SYSTEM = """You are the assistant for "cutter", a personal tool that t
 into short vertical clips and posts them to TikTok, Instagram Reels, and YouTube Shorts. You are \
 talking to Chris (the owner) over Telegram, from his phone.
 
-Your role is READ-ONLY: answer questions, explain how things work, report the current status, and \
-give advice. You cannot edit code, run commands, post clips, or change any state — if Chris wants \
-an actual change made, tell him to bring it up in a Claude Code session on the project (that's where \
-changes get made). Don't pretend to have taken an action you can't take.
+Your role is essentially read-only: answer questions, explain how things work, report the current \
+status, and give advice. The one action you can take is adding a video to the queue — Chris does that \
+by sending a message starting with "queue:" followed by a YouTube URL, which is handled automatically \
+(he doesn't need you to do anything). You cannot edit code, run commands, post clips, or change any \
+other state — if Chris wants an actual change made, tell him to bring it up in a Claude Code session \
+on the project (that's where changes get made). Don't pretend to have taken an action you can't take.
 
 Style: this is a phone chat. Be concise and direct — a few sentences, not an essay. Plain text is \
 fine; avoid heavy Markdown. Use the live state and project reference below; if you genuinely don't \
@@ -68,8 +70,13 @@ def run_assistant() -> None:
             if not text:
                 continue
             low = text.lower()
-            # Leave control commands for `cutter daily` to pick up from the journal.
-            if low.startswith("queue:") or low == "reset":
+            # queue: commands are actioned immediately so the queue reflects them
+            # right away (dedup means the 9am daily scan won't re-add them).
+            if low.startswith("queue:"):
+                _handle_queue(tg, text)
+                continue
+            # `reset` is destructive — leave it for `cutter daily` to handle.
+            if low == "reset":
                 continue
             print(f"[assistant] answering: {text[:60]!r}", flush=True)
             try:
@@ -78,6 +85,27 @@ def run_assistant() -> None:
                 print(f"[assistant] answer error: {e}", flush=True)
                 answer = "Sorry — I hit an error answering that. Try again in a moment."
             tg.send(answer[:3900])
+
+
+def _handle_queue(tg: TelegramClient, text: str) -> None:
+    """Add a `queue:<url>` command to the video queue immediately."""
+    from . import queue as q
+
+    url = text[len("queue:"):].strip().strip("'\"'‘’“”")
+    if not url:
+        tg.send("Send a URL after queue: — e.g. queue:https://youtu.be/…")
+        return
+    try:
+        added = q.add(url)
+    except Exception as e:
+        print(f"[assistant] queue add error: {e}", flush=True)
+        tg.send(f"Couldn't add that to the queue: {e}")
+        return
+    if added:
+        print(f"[assistant] queued: {url}", flush=True)
+        tg.send(f"✅ Added to the queue: {url}\nIt'll be processed on the next daily run (9am UK).")
+    else:
+        tg.send(f"That URL is already in the queue: {url}")
 
 
 def _answer(client: anthropic.Anthropic, model: str, claude_md: str, question: str) -> str:
