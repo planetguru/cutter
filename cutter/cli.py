@@ -428,6 +428,119 @@ def queue_list() -> None:
 
 
 # ---------------------------------------------------------------------------
+# cutter pending-downloads / cutter fetch  (residential download helper)
+# ---------------------------------------------------------------------------
+
+@main.command(name="pending-downloads")
+def pending_downloads() -> None:
+    """Print (as JSON) pending queued videos whose source isn't on this machine yet.
+
+    Run on the server; the residential `cutter fetch` helper consumes this."""
+    import json
+
+    from . import queue as q
+    from .downloader import _video_id_from_url
+
+    workdir = Path(platformdirs.user_data_dir("cutter"))
+    needed = []
+    for item in q.list_all():
+        if item.status != "pending":
+            continue
+        vid = _video_id_from_url(item.url)
+        have = bool(vid) and (workdir / vid / "source.mp4").exists() and (workdir / vid / "metadata.json").exists()
+        if not have:
+            needed.append({"url": item.url, "video_id": vid})
+    print(json.dumps(needed))
+
+
+@main.command(name="fetch")
+@click.option("--server", envvar="FETCH_SERVER", required=True,
+              help="SSH target of the cutter server, e.g. root@chris.uk.com (or set FETCH_SERVER)")
+@click.option("--remote-cutter", envvar="FETCH_REMOTE_CUTTER",
+              default="HOME=/root /opt/cutter/.venv/bin/cutter",
+              help="How to invoke cutter on the server")
+@click.option("--remote-datadir", envvar="FETCH_REMOTE_DATADIR",
+              default="/root/.local/share/cutter",
+              help="cutter data dir on the server")
+def fetch(server: str, remote_cutter: str, remote_datadir: str) -> None:
+    """Download the server's pending videos here (residential IP) and push them back.
+
+    Run this on a home/residential machine — YouTube blocks the server's datacenter
+    IP from video streams, but a normal home connection works fine. The server's
+    downloader then finds source.mp4 already present and skips its own download."""
+    import json
+    import shutil
+    import subprocess
+
+    from . import downloader
+
+    try:
+        check_ffmpeg()
+    except ConfigError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise SystemExit(1)
+
+    SSH = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new"]
+    SCP = ["scp", "-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new"]
+
+    # 1. Ask the server what it still needs.
+    res = subprocess.run(SSH + [server, f"{remote_cutter} pending-downloads"],
+                         capture_output=True, text=True)
+    if res.returncode != 0:
+        console.print(f"[red]Could not reach server:[/red] {res.stderr.strip()[:300]}")
+        raise SystemExit(1)
+    try:
+        items = json.loads(res.stdout.strip() or "[]")
+    except json.JSONDecodeError:
+        console.print(f"[red]Unexpected server response:[/red] {res.stdout.strip()[:300]}")
+        raise SystemExit(1)
+    if not items:
+        console.print("[dim]Nothing to fetch — server has all pending sources.[/dim]")
+        return
+
+    local = Path(platformdirs.user_data_dir("cutter")) / "fetch"
+    console.print(f"[dim]{len(items)} video(s) to fetch.[/dim]")
+
+    for it in items:
+        url = it["url"]
+        try:
+            console.print(f"Downloading {url} …")
+            asset = downloader.download(url, local)
+        except Exception as e:
+            console.print(f"[red]Download failed[/red] {url}: {str(e)[:200]}")
+            continue
+
+        vid = asset.video_id
+        d = local / vid
+        src, meta = d / "source.mp4", d / "metadata.json"
+        if not (src.exists() and meta.exists()):
+            console.print(f"[red]Missing files after download[/red] {vid}")
+            continue
+
+        remote_dir = f"{remote_datadir}/{vid}"
+        try:
+            subprocess.run(SSH + [server, f"mkdir -p {remote_dir}"], check=True,
+                           capture_output=True, text=True)
+            subprocess.run(SCP + [str(src), f"{server}:{remote_dir}/source.mp4.part"], check=True,
+                           capture_output=True, text=True)
+            subprocess.run(SCP + [str(meta), f"{server}:{remote_dir}/metadata.json.part"], check=True,
+                           capture_output=True, text=True)
+            # Atomically swap both into place so the server never sees a half file.
+            subprocess.run(
+                SSH + [server,
+                       f"mv {remote_dir}/source.mp4.part {remote_dir}/source.mp4 && "
+                       f"mv {remote_dir}/metadata.json.part {remote_dir}/metadata.json"],
+                check=True, capture_output=True, text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            console.print(f"[red]Push failed[/red] {vid}: {(e.stderr or '').strip()[:200]}")
+            continue
+
+        console.print(f"[green]Pushed[/green] {vid} → server")
+        shutil.rmtree(d, ignore_errors=True)  # local scratch no longer needed
+
+
+# ---------------------------------------------------------------------------
 # cutter assistant
 # ---------------------------------------------------------------------------
 
