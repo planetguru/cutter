@@ -120,7 +120,7 @@ This means `cutter run` is idempotent: re-running the same URL resumes from wher
 
 **Config** (`config.py`): all credentials from `.env` via python-dotenv. Each platform's credentials validated lazily only when that feature is used.
 
-**YouTube bot check** (`downloader.py`): from datacenter/server IPs YouTube often demands "Sign in to confirm you're not a bot". Fix by supplying a Netscape `cookies.txt` (exported from a logged-in browser, ideally a throwaway Google account): set `YOUTUBE_COOKIES=/path/to/cookies.txt` in `.env`, or drop `youtube_cookies.txt` in the workdir (`~/.local/share/cutter/` on the server). Both `_extract_metadata` and `_download_video` pass it to yt-dlp as `cookiefile`.
+**YouTube datacenter-IP block** (`downloader.py` + `cutter fetch`): from the server's datacenter IP YouTube first demands "Sign in to confirm you're not a bot" and, even with cookies, then serves only storyboards (no real streams — PO-token/SABR). Residential IPs are unaffected. So downloads run on a **home/residential machine**: a launchd helper runs `cutter fetch --server root@chris.uk.com`, which calls `cutter pending-downloads` on the server (pending queue videos missing their source), downloads each locally, and pushes `source.mp4`+`metadata.json` back (atomic rename). The server's `download()` fast-path then skips its own blocked fetch. See `docs/fetch_helper.md`. (`YOUTUBE_COOKIES`/`youtube_cookies.txt` cookie support still exists in the downloader for the residential side if ever needed, but isn't required there.)
 
 ## External Dependencies
 
