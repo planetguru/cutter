@@ -120,6 +120,8 @@ This means `cutter run` is idempotent: re-running the same URL resumes from wher
 
 **Config** (`config.py`): all credentials from `.env` via python-dotenv. Each platform's credentials validated lazily only when that feature is used.
 
+**YouTube bot check** (`downloader.py`): from datacenter/server IPs YouTube often demands "Sign in to confirm you're not a bot". Fix by supplying a Netscape `cookies.txt` (exported from a logged-in browser, ideally a throwaway Google account): set `YOUTUBE_COOKIES=/path/to/cookies.txt` in `.env`, or drop `youtube_cookies.txt` in the workdir (`~/.local/share/cutter/` on the server). Both `_extract_metadata` and `_download_video` pass it to yt-dlp as `cookiefile`.
+
 ## External Dependencies
 
 - `ffmpeg` on `PATH` — validated at startup

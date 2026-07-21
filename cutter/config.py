@@ -25,6 +25,11 @@ class Settings:
     # Claude
     anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
 
+    # yt-dlp cookies (Netscape cookies.txt) — needed when YouTube demands
+    # "Sign in to confirm you're not a bot" (common from datacenter/server IPs).
+    # If unset, the downloader also looks for youtube_cookies.txt in the workdir.
+    youtube_cookies: str = field(default_factory=lambda: os.getenv("YOUTUBE_COOKIES", ""))
+
     # TikTok
     tiktok_client_key: str = field(default_factory=lambda: os.getenv("TIKTOK_CLIENT_KEY", ""))
     tiktok_client_secret: str = field(default_factory=lambda: os.getenv("TIKTOK_CLIENT_SECRET", ""))
@@ -49,6 +54,9 @@ class Settings:
     facebook_page_id: str = field(default_factory=lambda: os.getenv("FACEBOOK_PAGE_ID", ""))
     facebook_page_token: str = field(default_factory=lambda: os.getenv("FACEBOOK_PAGE_TOKEN", ""))
     facebook_page_name: str = field(default_factory=lambda: os.getenv("FACEBOOK_PAGE_NAME", ""))
+    # Facebook Login for Business uses a config ID (built in the portal) instead
+    # of a scope list. Leave blank to fall back to classic scope-based login.
+    facebook_config_id: str = field(default_factory=lambda: os.getenv("FACEBOOK_CONFIG_ID", ""))
 
     # Instagram / Meta
     instagram_app_id: str = field(default_factory=lambda: os.getenv("INSTAGRAM_APP_ID", ""))

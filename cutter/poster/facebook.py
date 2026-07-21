@@ -160,10 +160,15 @@ def run_oauth_flow(settings: Settings) -> None:
     params = {
         "client_id": settings.facebook_app_id,
         "redirect_uri": redirect_uri,
-        "scope": SCOPES,
         "response_type": "code",
         "state": secrets.token_urlsafe(16),
     }
+    # Facebook Login for Business (Business-type apps) uses a portal-defined
+    # configuration instead of a scope list; classic Login uses scope.
+    if settings.facebook_config_id:
+        params["config_id"] = settings.facebook_config_id
+    else:
+        params["scope"] = SCOPES
     auth_url = AUTH_URL + "?" + urllib.parse.urlencode(params)
     code_holder: list[str] = []
 

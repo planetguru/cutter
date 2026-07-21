@@ -25,6 +25,19 @@ class VideoAsset:
     duration_secs: float
 
 
+def _cookiefile(workdir: Path) -> str | None:
+    """Resolve a yt-dlp cookies file: YOUTUBE_COOKIES, else workdir/youtube_cookies.txt."""
+    from .config import get_settings
+
+    configured = get_settings().youtube_cookies
+    if configured and Path(configured).expanduser().exists():
+        return str(Path(configured).expanduser())
+    fallback = workdir / "youtube_cookies.txt"
+    if fallback.exists():
+        return str(fallback)
+    return None
+
+
 def download(url: str, workdir: Path) -> VideoAsset:
     """Download video and metadata; skip if already present in workdir."""
     # Fast path: if we can derive the video_id from the URL and everything is
@@ -47,7 +60,8 @@ def download(url: str, workdir: Path) -> VideoAsset:
             )
 
     # Not cached — fetch from YouTube.
-    meta = _extract_metadata(url)
+    cookiefile = _cookiefile(workdir)
+    meta = _extract_metadata(url, cookiefile)
     video_id = meta["id"]
 
     asset_dir = workdir / video_id
@@ -60,7 +74,7 @@ def download(url: str, workdir: Path) -> VideoAsset:
         meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
 
     if not video_path.exists():
-        _download_video(url, video_path)
+        _download_video(url, video_path, cookiefile)
 
     return VideoAsset(
         video_id=video_id,
@@ -79,7 +93,7 @@ def _video_id_from_url(url: str) -> str | None:
     return m.group(1) if m else None
 
 
-def _extract_metadata(url: str) -> dict:
+def _extract_metadata(url: str, cookiefile: str | None = None) -> dict:
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -87,6 +101,8 @@ def _extract_metadata(url: str) -> dict:
         "getcomments": True,
         "extractor_args": {"youtube": {"max_comments": ["50"]}},
     }
+    if cookiefile:
+        opts["cookiefile"] = cookiefile
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -95,7 +111,7 @@ def _extract_metadata(url: str) -> dict:
         raise DownloadError(f"Failed to fetch metadata: {e}") from e
 
 
-def _download_video(url: str, dest: Path) -> None:
+def _download_video(url: str, dest: Path, cookiefile: str | None = None) -> None:
     opts = {
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
@@ -107,6 +123,8 @@ def _download_video(url: str, dest: Path) -> None:
         "continuedl": True,
         "socket_timeout": 30,
     }
+    if cookiefile:
+        opts["cookiefile"] = cookiefile
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([url])
