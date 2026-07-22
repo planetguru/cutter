@@ -45,6 +45,7 @@ def approve_clip(
         title=caption.title,
         tiktok_caption=caption.tiktok_caption,
         instagram_caption=caption.instagram_caption,
+        youtube_caption=caption.youtube_caption,
         hashtags=list(caption.hashtags),
     )
 
@@ -127,12 +128,20 @@ def _handle_reply(
         wa.send(_build_edit_ack("Instagram caption", current.instagram_caption, clip_index, total_clips))
         return None
 
-    # --- Edit description (alias for both captions) ---
+    # --- Edit YouTube description only ---
+    m = re.match(r"(?:youtube|yt)\s*[:\-]\s*(.+)", reply, re.IGNORECASE)
+    if m:
+        current.youtube_caption = m.group(1).strip()
+        wa.send(_build_edit_ack("YouTube description", current.youtube_caption, clip_index, total_clips))
+        return None
+
+    # --- Edit description (alias for all three captions) ---
     m = re.match(r"(?:desc|description|d)\s*[:\-]\s*(.+)", reply, re.IGNORECASE)
     if m:
         current.tiktok_caption = m.group(1).strip()
         current.instagram_caption = m.group(1).strip()
-        wa.send(_build_edit_ack("Description", current.tiktok_caption, clip_index, total_clips))
+        current.youtube_caption = m.group(1).strip()
+        wa.send(_build_edit_ack("Description (all platforms)", current.tiktok_caption, clip_index, total_clips))
         return None
 
     # --- Edit hashtags ---
@@ -150,9 +159,10 @@ def _handle_reply(
         "  *no* — skip\n"
         "  *no more today* — stop for today\n"
         "  *title: ...*\n"
-        "  *desc: ...*\n"
+        "  *desc: ...* (all platforms)\n"
         "  *tiktok: ...*\n"
         "  *instagram: ...*\n"
+        "  *youtube: ...*\n"
         "  *tags: #tag1 #tag2*"
     )
     return None  # keep conversation open
@@ -173,13 +183,15 @@ def _build_prompt(
 
     title = caption.title or caption.tiktok_caption.splitlines()[0].strip()
 
+    youtube_body = caption.youtube_caption or caption.tiktok_caption
     return (
         f"📹 *Clip {clip_index}/{total_clips}* — {title}\n\n"
         f"*TikTok:*\n{_trunc(caption.tiktok_caption)}\n\n"
         f"*Instagram:*\n{_trunc(caption.instagram_caption)}\n\n"
+        f"*YouTube:*\n{_trunc(youtube_body)}\n\n"
         f"*Tags:* {caption.hashtag_string}\n\n"
         "Reply: *yes* · *no* · *no more today*\n"
-        "Edit: *title:* · *desc:* · *tiktok:* · *instagram:* · *tags:*"
+        "Edit: *title:* · *desc:* · *tiktok:* · *instagram:* · *youtube:* · *tags:*"
     )
 
 

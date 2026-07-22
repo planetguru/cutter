@@ -32,6 +32,21 @@ class YouTubeError(Exception):
     pass
 
 
+def _youtube_title(caption: Caption | None, clip_path: Path) -> str:
+    """YouTube title: the generated title, else a word-boundary-safe fallback
+    (never a mid-word truncation). YouTube's hard limit is 100 characters."""
+    if caption and caption.title.strip():
+        return caption.title.strip()[:100]
+    base = ""
+    if caption:
+        base = (caption.youtube_caption or caption.tiktok_caption).strip()
+    base = base.splitlines()[0].strip() if base else clip_path.stem
+    if len(base) <= 100:
+        return base
+    cut = base[:100].rsplit(" ", 1)[0].rstrip(" ,.;:-")
+    return cut or base[:100]
+
+
 class YouTubePoster:
     def __init__(self, settings: Settings) -> None:
         settings.require_youtube()
@@ -39,8 +54,12 @@ class YouTubePoster:
         self._access_token = settings.youtube_access_token
 
     def post(self, clip_path: Path, caption: Caption | None) -> PostResult:
-        title = (caption.title or caption.tiktok_caption[:100]) if caption else clip_path.stem
-        description = (caption.tiktok_caption if caption else "") + "\n\n#Shorts"
+        title = _youtube_title(caption, clip_path)
+        # Prefer the dedicated YouTube description; fall back to the TikTok caption.
+        body = ""
+        if caption:
+            body = (caption.youtube_caption or caption.tiktok_caption).strip()
+        description = (body + "\n\n#Shorts").strip()
         tags = (caption.hashtags if caption else []) + ["Shorts"]
 
         try:

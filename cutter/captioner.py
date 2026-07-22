@@ -21,6 +21,7 @@ class Caption:
     instagram_caption: str
     hashtags: list[str]
     title: str = ""
+    youtube_caption: str = ""  # YouTube Shorts description (falls back to tiktok_caption if empty)
 
     @property
     def hashtag_string(self) -> str:
@@ -76,6 +77,7 @@ def _generate_one(
         title=data.get("title", ""),
         tiktok_caption=data["tiktok_caption"],
         instagram_caption=data["instagram_caption"],
+        youtube_caption=data.get("youtube_caption", ""),
         hashtags=data["hashtags"],
     )
 
@@ -97,13 +99,17 @@ def _build_prompt(asset: VideoAsset, clip_index: int, total_clips: int) -> str:
   <clip_index>{clip_index + 1} of {total_clips}</clip_index>
 </video_metadata>
 
-Generate captions and hashtags for this clip suitable for both TikTok and Instagram Reels.
+Generate captions and hashtags for this clip suitable for TikTok, Instagram Reels, and YouTube Shorts.
 
 Requirements:
 - TikTok caption: max 2,200 characters. First line should describe what the clip is actually about
   in plain language — specific enough to be interesting, not vague. No hype, no dramatic rhetoric.
 - Instagram caption: max 2,200 characters. Same tone as TikTok. Use paragraph breaks for readability.
   Instagram truncates to ~125 chars before "more", so make the first sentence count.
+- YouTube description: 2-4 complete sentences (up to ~600 characters). A fuller, standalone
+  description that reads well on a YouTube Shorts watch page: what the clip shows and any useful
+  context from the metadata. Complete sentences throughout — never trailing off mid-thought. Same
+  plain, direct first-person voice. Do not include hashtags in this field.
 - Hashtags: 10-15 tags, mix of broad (#fyp, #reels) and niche tags tightly relevant to the content,
   no # prefix. Do not pad with generic unrelated tags.
 - Write in a plain, direct, first-person voice. Describe what is actually happening.
@@ -115,7 +121,7 @@ Requirements:
 - Do not fabricate claims not supported by the metadata.
 
 Also generate a short title for the clip (used as the YouTube title and shown during approval).
-- Max 60 characters.
+- Max 60 characters, and must be a complete phrase (never cut off mid-word).
 - A noun phrase or short statement — not a sentence beginning with "I".
 - Specific enough to be interesting on its own: name the subject, technique, or moment.
 - Not a summary of the description. Think: what would you tap on in a feed?
@@ -126,5 +132,6 @@ Respond with valid JSON only, no markdown fences:
   "title": "...",
   "tiktok_caption": "...",
   "instagram_caption": "...",
+  "youtube_caption": "...",
   "hashtags": ["tag1", "tag2"]
 }}"""
