@@ -36,7 +36,7 @@ class Settings:
     tiktok_access_token: str = field(default_factory=lambda: os.getenv("TIKTOK_ACCESS_TOKEN", ""))
     tiktok_refresh_token: str = field(default_factory=lambda: os.getenv("TIKTOK_REFRESH_TOKEN", ""))
     tiktok_open_id: str = field(default_factory=lambda: os.getenv("TIKTOK_OPEN_ID", ""))
-    # "manual" sends the clip + caption via WhatsApp to post by hand (no TikTok
+    # "manual" sends the clip + caption via Telegram to post by hand (no TikTok
     # API involved — the only reliable option for unaudited personal apps);
     # "inbox" uploads a draft to the user's TikTok inbox (sandbox-compatible on
     # paper, but drafts were never delivered in testing); "direct" posts

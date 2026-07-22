@@ -1,140 +1,136 @@
 # cutter
 
-Downloads a YouTube video, cuts it into short vertical clips, and posts them to TikTok, Instagram Reels, and YouTube Shorts — one clip per day, with optional Telegram approval before each post.
+Turns your YouTube videos into short vertical clips and posts them to **TikTok, Instagram Reels, YouTube Shorts, and Facebook Reels** — one clip per day, with approval and edits from your phone over Telegram.
+
+You queue a YouTube URL; cutter downloads it, detects natural cut points, slices it into clips, reframes each to 9:16, writes platform-specific captions with Claude, and — once you approve on Telegram — publishes to whichever platforms you've configured.
 
 ## How it works
 
-1. You add YouTube URLs to a queue (via the CLI or Telegram)
-2. Every morning at 9am, the cron job picks the next clip from the queue, sends it to you on Telegram as a video preview
-3. You reply **yes** to post it, **no** to skip it, or **no more today** to stop and resume tomorrow
-4. Approved clips are posted to whichever platforms you have set up
+```
+YouTube URL
+  → downloader   source.mp4 + metadata.json   (yt-dlp)
+  → detector     cut_points.json              (FFmpeg scene + silence detection)
+  → slicer       raw/clip_NNN.mp4             (fast stream-copy)
+  → reframer     reframed/clip_NNN.mp4        (9:16: blurred background or rotated)
+  → captioner    captions.json               (Claude Haiku — per-platform captions)
+  → approver     Telegram conversation per clip
+  → posters      TikTok / Instagram / YouTube / Facebook
+```
 
-Each YouTube video is cut into multiple clips. They go out one per day, in order, before moving on to the next video in the queue.
+1. Add YouTube URLs to a queue (CLI or a Telegram message).
+2. A daily cron job (9am) processes the next pending clip and sends it to you on Telegram — the video plus generated captions.
+3. You reply **yes** to post, **no** to skip, **no more today** to pause, or edit the captions first.
+4. Approved clips post to your configured platforms. Each video's clips go out one per day, in order.
 
-## Setup on a new machine
+## Architecture / where it runs
+
+cutter is designed to run on an **always-on server** (so the daily job fires whether or not your laptop is on). Two wrinkles are worth knowing:
+
+- **Downloads run on a residential machine, not the server.** YouTube blocks datacenter/server IPs from actual video streams. So a small helper (`cutter fetch`) runs on a home/residential machine (e.g. a Mac mini): it asks the server which queued videos it's missing, downloads them locally, and pushes the files back. The server then processes them without ever contacting YouTube. See [`docs/fetch_helper.md`](docs/fetch_helper.md).
+- **A read-only Telegram assistant** (`cutter assistant`, a long-running service) lets you ask freeform questions from your phone — queue status, how things work, etc. It can add videos to the queue but cannot change code or post.
+
+Both are optional: on a residential machine with a normal IP you can skip the fetch helper and let the server download directly.
+
+## Platform notes
+
+| Platform | Status |
+|---|---|
+| **YouTube Shorts** | Full auto-posting. Its own dedicated description + title. |
+| **Instagram Reels** | Full auto-posting via the Instagram-login API (no Facebook Page needed). |
+| **TikTok** | **Manual** by default — TikTok won't grant API access to personal apps, so the clip + caption are sent to Telegram for you to post by hand. (`inbox`/`direct` API modes exist but need an audited app.) |
+| **Facebook Reels** | Implemented, but public posting needs Meta App Review + business verification; posts to a Facebook Page. |
+
+## Reframing modes
+
+Each queued video is cut to 9:16 in one of two ways:
+
+- **`blur`** (default) — the landscape frame sits centred on a blurred fill background.
+- **`rotate`** — the landscape frame is rotated 90° to fill the whole screen (the viewer turns their phone). Good for detailed visuals. Queue with the `queuev:` Telegram command or `--reframe rotate`.
+
+## Setup
+
+### On the server (or any machine that posts)
 
 ```bash
 git clone https://github.com/planetguru/cutter
 cd cutter
-cp .env.example .env
-# Edit .env and fill in your credentials (see below)
-bash setup.sh
+cp .env.example .env        # then fill it in — see .env.example for every key
+bash setup.sh              # venv + deps + a daily 9am cron job
 ```
 
-`setup.sh` creates the Python environment, installs dependencies, and registers a daily 9am cron job. To change the time, run `crontab -e` afterwards.
-
-## Credentials (.env)
-
-Fill in `.env` before running anything. Each section is only required if you're posting to that platform.
-
-| Variable | What it is |
-|---|---|
-| `ANTHROPIC_API_KEY` | Required. Used to generate captions. Get one at console.anthropic.com |
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather — see `docs/telegram_setup.md` |
-| `TELEGRAM_CHAT_ID` | Your chat ID — discovered by `cutter auth telegram` |
-| `PREVIEW_HOST` / `PREVIEW_USER` / `PREVIEW_WEBROOT` / `PREVIEW_BASE_URL` | SSH server where clip previews are hosted temporarily during approval |
-| `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | TikTok developer app credentials |
-| `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | Meta developer app credentials |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_S3_BUCKET` | S3 bucket for temporary Instagram video staging |
-| `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` | Google OAuth app credentials |
-
-## Authenticating with platforms
-
-Run these once after filling in the client credentials above. Each opens a browser for OAuth and writes the resulting tokens back to `.env`.
+Authenticate each platform you want (opens a browser, writes tokens back to `.env`):
 
 ```bash
 source .venv/bin/activate
-
-cutter auth youtube     # shows which channel will receive uploads — re-run if wrong
-cutter auth tiktok
+cutter auth telegram        # capture your Telegram chat ID (needs TELEGRAM_BOT_TOKEN)
+cutter auth youtube         # prints the channel name so you can confirm it's the right one
 cutter auth instagram
-cutter auth instagram --refresh   # refresh Instagram token before the 60-day expiry
+cutter auth facebook
+cutter auth tiktok          # only if using TikTok's API modes (not needed for manual)
 ```
+
+Per-platform credential setup is documented under [`docs/`](docs/): `telegram_setup.md`, `tiktok_oauth.md`, `instagram_oauth.md`, `facebook_oauth.md`.
+
+To run the read-only assistant as a service, run `cutter assistant` under a process manager (systemd/launchd). See `docs/fetch_helper.md` for a launchd example (the same pattern applies).
+
+### On the residential download machine (optional but recommended)
+
+Same clone + `setup.sh` + `ffmpeg`, then run `cutter fetch --server <you>@<server>` on a schedule (launchd/cron). Full instructions in [`docs/fetch_helper.md`](docs/fetch_helper.md).
 
 ## Managing the queue
 
 ```bash
-# Add a video
-cutter queue add "https://www.youtube.com/watch?v=..."
-
-# See what's queued
+cutter queue add "https://www.youtube.com/watch?v=..."               # blurred-background 9:16
+cutter queue add "https://www.youtube.com/watch?v=..." --reframe rotate   # rotated full-screen
 cutter queue list
 ```
 
-You can also queue a video from your phone by sending your Telegram bot a message:
+Or from your phone, message the Telegram bot:
 
 ```
-queue:https://www.youtube.com/watch?v=...
+queue:https://www.youtube.com/watch?v=...      normal 9:16 cut
+queuev:https://www.youtube.com/watch?v=...     rotated full-screen cut
 ```
 
-Cutter picks it up automatically at the start of the next daily run.
+The assistant actions these immediately; the daily run also picks them up.
 
 ## Running manually
 
 ```bash
 source .venv/bin/activate
 
-# Process the next clip in the queue (same as the cron job)
-cutter daily
+cutter daily                      # process the next queued clip (what cron runs)
+cutter daily --no-approve         # post without asking
+cutter daily --max-clips 3        # more than one clip this run (0 = no limit)
+cutter daily --post youtube       # restrict platforms (tiktok|instagram|youtube|facebook|both|all|none)
 
-# Post to YouTube only (if TikTok/Instagram aren't set up yet)
-cutter daily --post youtube
+cutter run --url "..." --post all --approve          # full pipeline on one URL, bypass the queue
+cutter run --url "..." --reframe rotate --post all   # rotated full-screen
 
-# Skip Telegram approval and post automatically
-cutter daily --no-approve
-
-# Process more than one clip in a single run
-cutter daily --max-clips 3    # 0 = no limit
-
-# Run the full pipeline on a specific URL, bypassing the queue
-cutter run --url "https://www.youtube.com/watch?v=..." --post all --approve
+cutter detect --url "..."         # preview cut points only
+cutter reframe path/to/clip.mp4   # reframe a single file to 9:16
+cutter withheld                   # list clips you declined
+cutter reset                      # kill running jobs, wipe queue/state/downloads (fresh start)
 ```
 
 ## Telegram approval
 
-When a clip is ready, cutter sends two messages: a video preview, then a text prompt showing the generated captions and your reply options.
+For each clip you get the video plus a prompt showing the TikTok, Instagram, and YouTube captions and tags. Reply:
 
-| Reply | What happens |
+| Reply | Effect |
 |---|---|
-| `yes` | Clip is posted |
-| `no` | Clip is skipped (moved to withheld folder) |
-| `no more today` | Stops for the day — resumes remaining clips tomorrow |
-| `title: new title` | Updates the clip title before posting |
-| `tiktok: new caption` | Updates the TikTok caption |
-| `instagram: new caption` | Updates the Instagram caption |
-| `tags: tag1 tag2 tag3` | Replaces the hashtags |
+| `yes` | Post the clip |
+| `no` | Skip (moved to the withheld folder) |
+| `no more today` | Stop for the day; resume tomorrow |
+| `title: ...` | Set the title (used for YouTube + shown in the prompt) |
+| `desc: ...` | Set **all** platform captions at once |
+| `tiktok: ...` / `instagram: ...` / `youtube: ...` | Set one platform's caption |
+| `tags: #a #b #c` | Replace the hashtags |
 
-After making edits, the updated preview is shown again for confirmation.
+Edits re-show the prompt for confirmation. Each platform's caption is independent — editing the TikTok caption no longer affects YouTube.
 
-## Resetting everything
+## Data, state, and logs
 
-```bash
-cutter reset
-```
+Working data lives in the platform data dir — **macOS:** `~/Library/Application Support/cutter/`, **Linux:** `~/.local/share/cutter/`. Each video gets a subfolder (source, clips, captions); `queue.json` and `approval_state.json` sit at the root, and re-running is idempotent (it resumes where it left off).
 
-Kills any in-flight processes, clears the queue, wipes approval state, and deletes all downloaded videos, clips, and captions. Use this to start completely fresh.
-
-## Viewing withheld clips
-
-```bash
-cutter withheld
-```
-
-Withheld clips are kept in `{data dir}/{video id}/withheld/` and are never deleted automatically.
-
-## Data directory
-
-All downloaded videos, clips, and state are stored in:
-
-- **macOS:** `~/Library/Application Support/cutter/`
-- **Linux:** `~/.local/share/cutter/`
-
-Each YouTube video gets its own subfolder named after its video ID. The queue and approval state are stored as JSON files in the root of that directory.
-
-## Logs
-
-When running via cron, output is written to `cutter.log` in the project directory. Check it if something isn't posting as expected.
-
-```bash
-tail -f /path/to/cutter/cutter.log
-```
+Cron output goes to `cutter.log` in the project directory (or `/var/log/cutter.log` on the server). Nothing sensitive is ever committed — `.env` is gitignored; use `.env.example` as the template.
