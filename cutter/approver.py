@@ -196,11 +196,13 @@ def _build_prompt(
 
 
 def _build_edit_ack(field_name: str, new_value: str, clip_index: int, total_clips: int) -> str:
-    preview = new_value[:200] + ("…" if len(new_value) > 200 else "")
+    # Echo the full new value so the user can verify it (Telegram allows 4096
+    # chars; captions cap at 2200, so this fits with room to spare).
+    preview = new_value if len(new_value) <= 3500 else new_value[:3500] + "…"
     return (
         f"✏️ *{field_name}* updated:\n_{preview}_\n\n"
         f"Clip {clip_index}/{total_clips} — reply *yes* to post, *no* to skip, "
-        "or keep editing (title / desc / tiktok / instagram / tags)."
+        "or keep editing (title / desc / tiktok / instagram / youtube / tags)."
     )
 
 
