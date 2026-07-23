@@ -566,7 +566,7 @@ def assistant() -> None:
 @click.option("--approve/--no-approve", default=True,
               help="Ask for Telegram approval before posting (default: on)")
 @click.option("--max-clips", default=1, show_default=True,
-              help="Maximum clips to process per run (0 = no limit)")
+              help="Max clips to POST per run (0 = no limit); rejected ('no') clips don't count")
 def daily(post: str, approve: bool, max_clips: int) -> None:
     """Process the next queued video. Designed to run from cron once a day."""
     import json

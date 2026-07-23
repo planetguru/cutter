@@ -162,10 +162,10 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
     vs = app_state.get_or_create_video(asset.video_id, clip_names)
     store.save()
 
-    # Filter to only pending clips (resume support)
+    # Filter to only pending clips (resume support). We offer them in order and
+    # stop after posting `max_clips` of them — rejected ("no") clips don't count,
+    # so daily keeps offering the next candidate until one is approved.
     pending_clips = [c for c in final_clips if c.name in vs.pending]
-    if options.max_clips is not None:
-        pending_clips = pending_clips[: options.max_clips]
     reframed_dir = options.workdir / asset.video_id / "reframed"
 
     # Telegram client (only if approval mode)
@@ -175,6 +175,7 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
 
     results: list[ClipResult] = []
     total = len(pending_clips)
+    posted = 0
 
     for i, clip_path in enumerate(pending_clips, 1):
         cap = captions_list[clip_names.index(clip_path.name)] if clip_path.name in clip_names else None
@@ -185,21 +186,25 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
             cap = result.caption  # may have been edited
 
             if result.decision == Decision.WITHHELD:
+                # "no" — this clip's a dud; withhold it and offer the next one.
                 store.withhold_clip(asset.video_id, clip_path.name, reframed_dir)
                 results.append(ClipResult(clip_path=clip_path, caption=cap, withheld=True))
                 continue
 
             if result.decision == Decision.NO_MORE_TODAY:
+                # Hold the current candidate (leave it pending) and stop for
+                # today; tomorrow's run resumes from it.
                 app_state.pause_until_tomorrow()
                 store.save()
-                # Mark remaining clips as skipped for today
-                for remaining in pending_clips[i:]:
+                for remaining in pending_clips[i - 1:]:
                     results.append(ClipResult(clip_path=remaining, caption=None, skipped_today=True))
                 break
 
             if result.decision == Decision.TIMEOUT:
-                results.append(ClipResult(clip_path=clip_path, caption=cap, withheld=True))
-                continue
+                # No response — hold this clip (leave it pending) and stop for today.
+                for remaining in pending_clips[i - 1:]:
+                    results.append(ClipResult(clip_path=remaining, caption=None, skipped_today=True))
+                break
 
             # APPROVED — fall through to posting
 
@@ -233,7 +238,7 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
         if any(r.success for r in clip_result.post_results):
             store.mark_posted(asset.video_id, clip_path.name)
 
-        # Notify via WhatsApp when posting succeeds
+        # Notify via Telegram when posting succeeds
         if wa is not None and clip_result.post_results:
             successes = [r for r in clip_result.post_results if r.success]
             # Manual TikTok hand-off announces itself with the download link.
@@ -242,8 +247,9 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
                 if not (r.platform == "tiktok" and settings.tiktok_post_mode == "manual")
             ]
             if announce:
-                platforms = " & ".join(r.platform.title() for r in announce)
-                wa.send(f"🚀 Clip {i}/{total} posted to {platforms}!")
+                # NB: a separate local name — do not shadow the `platforms` set.
+                names = " & ".join(r.platform.title() for r in announce)
+                wa.send(f"🚀 Clip {i}/{total} posted to {names}!")
             tiktok_inbox = settings.tiktok_post_mode == "inbox" and any(
                 r.platform == "tiktok" for r in successes
             )
@@ -256,6 +262,12 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
                 )
 
         results.append(clip_result)
+
+        # One posted clip per run by default (max_clips). "no" rejections don't
+        # reach here, so we keep offering candidates until one is approved.
+        posted += 1
+        if options.max_clips is not None and posted >= options.max_clips:
+            break
 
     # Clean up raw clips
     if not options.keep_raw:
