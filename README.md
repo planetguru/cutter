@@ -1,6 +1,6 @@
 # cutter
 
-Turns your YouTube videos into short vertical clips and posts them to **TikTok, Instagram Reels, YouTube Shorts, and Facebook Reels** — one clip per day, with approval and edits from your phone over Telegram.
+Turns your YouTube videos into short vertical clips and posts them to **Instagram Reels and YouTube Shorts** (plus a manual TikTok hand-off) — one clip per day, with approval and edits from your phone over Telegram. Facebook Reels support is scaffolded but not enabled (see the platform table).
 
 You queue a YouTube URL; cutter downloads it, detects natural cut points, slices it into clips, reframes each to 9:16, writes platform-specific captions with Claude, and — once you approve on Telegram — publishes to whichever platforms you've configured.
 
@@ -14,7 +14,7 @@ YouTube URL
   → reframer     reframed/clip_NNN.mp4        (9:16: blurred background or rotated)
   → captioner    captions.json               (Claude Haiku — per-platform captions)
   → approver     Telegram conversation per clip
-  → posters      TikTok / Instagram / YouTube / Facebook
+  → posters      Instagram / YouTube / TikTok (manual)   [Facebook: scaffolded, off]
 ```
 
 1. Add YouTube URLs to a queue (CLI or a Telegram message).
@@ -38,7 +38,7 @@ Both are optional: on a residential machine with a normal IP you can skip the fe
 | **YouTube Shorts** | Full auto-posting. Its own dedicated description + title. |
 | **Instagram Reels** | Full auto-posting via the Instagram-login API (no Facebook Page needed). |
 | **TikTok** | **Manual** by default — TikTok won't grant API access to personal apps, so the clip + caption are sent to Telegram for you to post by hand. (`inbox`/`direct` API modes exist but need an audited app.) |
-| **Facebook Reels** | Implemented, but public posting needs Meta App Review + business verification; posts to a Facebook Page. |
+| **Facebook Reels** | **Not enabled.** Code is scaffolded, but public posting to a Page needs Meta App Review + business verification, so cutter does not currently post to Facebook. |
 
 ## Reframing modes
 

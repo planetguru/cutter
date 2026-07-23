@@ -228,7 +228,7 @@
     <div class="wrap">
 
       <section class="hero">
-        <h1>YouTube to TikTok,<br>Instagram, YouTube<br>&amp; Facebook, <em>with your approval.</em></h1>
+        <h1>YouTube to TikTok,<br>Instagram, and<br>YouTube Shorts, <em>with your approval.</em></h1>
         <p class="lead">Give cutter a YouTube URL. It cuts the video into short vertical clips, writes captions tailored to each platform, sends every clip to your phone on Telegram for review, and posts the ones you approve — one a day.</p>
         <div class="cmd">
           <span class="p">$ </span><span class="kw">cutter run</span>
@@ -282,7 +282,7 @@
             <span class="n">06</span>
             <div class="step-body">
               <strong>Post</strong>
-              <span>Approved clips go to Instagram Reels, YouTube Shorts, and Facebook Reels. TikTok has no API for personal apps, so its clip is handed back over Telegram to post by hand.</span>
+              <span>Approved clips go to Instagram Reels and YouTube Shorts. TikTok has no API for personal apps, so its clip is handed back over Telegram to post by hand.</span>
             </div>
           </div>
         </div>
@@ -292,7 +292,7 @@
         <h2>Details</h2>
         <p>Every stage writes its output to disk. Re-running the same URL resumes from wherever it left off - clips already cut, captioned, or posted are not repeated. A withheld clip stays withheld across runs.</p>
         <p>The approval conversation runs over a Telegram bot - no session limits, and clips are sent as playable videos. A companion read-only assistant answers freeform questions from your phone ("what's in the queue?", "how does posting work?") and can queue new videos, but never changes anything else.</p>
-        <p>Posting credentials are loaded from <strong>.env</strong> and validated only when the platform is actually in use. YouTube and Instagram post automatically; TikTok is a manual hand-off (its API is closed to personal apps); Facebook Reels posts to a Page once the app clears Meta's review.</p>
+        <p>Posting credentials are loaded from <strong>.env</strong> and validated only when the platform is actually in use. YouTube and Instagram post automatically; TikTok is a manual hand-off, since its API is closed to personal apps.</p>
       </section>
 
       <section style="margin-bottom: 4rem;">
@@ -301,7 +301,7 @@
         <div class="cmd"><span class="p">$ </span><span class="kw">cutter queue add</span> <span class="val">URL</span> <span class="fl">--reframe</span> <span class="val">rotate</span></div>
         <div class="cmd"><span class="p">$ </span><span class="kw">cutter fetch</span> <span class="fl">--server</span> <span class="val">you@home</span> <span class="cm"> # home retriever</span></div>
         <div class="cmd"><span class="p">$ </span><span class="kw">cutter assistant</span> <span class="cm">              # read-only Telegram Q&amp;A</span></div>
-        <div class="cmd"><span class="p">$ </span><span class="kw">cutter auth</span> <span class="val">telegram|youtube|instagram|facebook|tiktok</span></div>
+        <div class="cmd"><span class="p">$ </span><span class="kw">cutter auth</span> <span class="val">telegram|youtube|instagram|tiktok</span></div>
       </section>
 
       <section>
