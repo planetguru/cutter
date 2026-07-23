@@ -56,9 +56,13 @@ def _extract_thumbnail(clip_path: Path) -> Path | None:
     fd, tmp = tempfile.mkstemp(suffix=".jpg")
     os.close(fd)
     tmp_path = Path(tmp)
+    # Crop the centre 16:9 band — that's where the actual (landscape) content
+    # sits in the reframed 9:16 clip; the rest is blurred fill. A 16:9 thumbnail
+    # fills YouTube's thumbnail frame instead of being letterboxed into a dark
+    # strip (which looked blank at grid size).
     r = subprocess.run(
         ["ffmpeg", "-v", "error", "-ss", f"{ts:.2f}", "-i", str(clip_path),
-         "-frames:v", "1", "-q:v", "3", "-y", str(tmp_path)],
+         "-frames:v", "1", "-vf", "crop=iw:2*round(iw*9/32)", "-q:v", "3", "-y", str(tmp_path)],
         capture_output=True,
     )
     if r.returncode == 0 and tmp_path.exists() and tmp_path.stat().st_size > 0:
