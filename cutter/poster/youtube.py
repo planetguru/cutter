@@ -32,6 +32,41 @@ class YouTubeError(Exception):
     pass
 
 
+def _extract_thumbnail(clip_path: Path) -> Path | None:
+    """Grab a single frame from a per-clip-varied point in the middle of the
+    clip (avoids near-identical opening frames across clips of one source)."""
+    import hashlib
+    import subprocess
+    import tempfile
+
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", str(clip_path)],
+            capture_output=True, text=True, timeout=30,
+        )
+        duration = float(out.stdout.strip())
+    except Exception:
+        duration = 0.0
+
+    # Deterministic offset in the middle 60% of the clip, different per clip.
+    h = int(hashlib.sha1(clip_path.name.encode()).hexdigest(), 16)
+    ts = duration * (0.2 + (h % 1000) / 1000 * 0.6) if duration > 0 else 1.0
+
+    fd, tmp = tempfile.mkstemp(suffix=".jpg")
+    os.close(fd)
+    tmp_path = Path(tmp)
+    r = subprocess.run(
+        ["ffmpeg", "-v", "error", "-ss", f"{ts:.2f}", "-i", str(clip_path),
+         "-frames:v", "1", "-q:v", "3", "-y", str(tmp_path)],
+        capture_output=True,
+    )
+    if r.returncode == 0 and tmp_path.exists() and tmp_path.stat().st_size > 0:
+        return tmp_path
+    tmp_path.unlink(missing_ok=True)
+    return None
+
+
 def _youtube_title(caption: Caption | None, clip_path: Path) -> str:
     """YouTube title: the generated title, else a word-boundary-safe fallback
     (never a mid-word truncation). YouTube's hard limit is 100 characters."""
@@ -64,10 +99,41 @@ class YouTubePoster:
 
         try:
             video_id = self._upload(clip_path, title, description, tags)
+            # Best-effort: give each Short a distinct thumbnail so clips from the
+            # same source video don't all look identical in the channel grid.
+            self._try_set_thumbnail(video_id, clip_path)
             url = f"https://www.youtube.com/shorts/{video_id}"
             return PostResult(platform="youtube", clip_path=clip_path, url=url, publish_id=video_id)
         except YouTubeError as e:
             return PostResult(platform="youtube", clip_path=clip_path, error=str(e))
+
+    def _try_set_thumbnail(self, video_id: str, clip_path: Path) -> None:
+        """Extract a distinctive frame and set it as the video's thumbnail.
+        Never fails the post — custom thumbnails need a verified channel, and
+        YouTube may ignore them for Shorts on some surfaces."""
+        thumb = _extract_thumbnail(clip_path)
+        if not thumb:
+            return
+        try:
+            for attempt in (1, 2):
+                with thumb.open("rb") as fh:
+                    resp = requests.post(
+                        "https://www.googleapis.com/upload/youtube/v3/thumbnails/set",
+                        params={"videoId": video_id, "uploadType": "media"},
+                        headers={"Authorization": f"Bearer {self._access_token}",
+                                 "Content-Type": "image/jpeg"},
+                        data=fh, timeout=120,
+                    )
+                if resp.status_code == 401 and attempt == 1:
+                    self._refresh_token()
+                    continue
+                if not resp.ok:
+                    print(f"[youtube] thumbnail not set ({resp.status_code}): {resp.text[:200]}", flush=True)
+                break
+        except Exception as e:
+            print(f"[youtube] thumbnail error: {e}", flush=True)
+        finally:
+            thumb.unlink(missing_ok=True)
 
     def _upload(self, clip_path: Path, title: str, description: str, tags: list[str]) -> str:
         file_size = clip_path.stat().st_size
