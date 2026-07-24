@@ -99,6 +99,9 @@ class YouTubePoster:
         if caption:
             body = (caption.youtube_caption or caption.tiktok_caption).strip()
         description = (body + "\n\n#Shorts").strip()
+        if caption:
+            from ..captioner import append_attribution
+            description = append_attribution(description, caption.video_id, max_len=4900)
         tags = (caption.hashtags if caption else []) + ["Shorts"]
 
         try:

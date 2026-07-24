@@ -51,7 +51,9 @@ class FacebookPoster:
         # Facebook Reels take the Instagram caption + hashtags well enough.
         text = ""
         if caption:
-            text = f"{caption.instagram_caption}\n\n{caption.hashtag_string}".strip()[:2200]
+            from ..captioner import append_attribution
+            text = f"{caption.instagram_caption}\n\n{caption.hashtag_string}".strip()
+            text = append_attribution(text, caption.video_id, max_len=2200)
 
         try:
             video_id, upload_url = self._start()

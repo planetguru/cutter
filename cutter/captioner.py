@@ -15,6 +15,9 @@ from .downloader import VideoAsset
 MODEL = "claude-haiku-4-5-20251001"
 
 
+ATTRIBUTION_PREFIX = "Original video:"
+
+
 @dataclass
 class Caption:
     tiktok_caption: str
@@ -22,10 +25,43 @@ class Caption:
     hashtags: list[str]
     title: str = ""
     youtube_caption: str = ""  # YouTube Shorts description (falls back to tiktok_caption if empty)
+    video_id: str = ""         # canonical source YouTube video ID (for attribution)
 
     @property
     def hashtag_string(self) -> str:
         return " ".join(f"#{tag.lstrip('#')}" for tag in self.hashtags)
+
+
+def source_url(video_id: str) -> str:
+    """Canonical short YouTube URL for a video ID, with no query/fragment junk."""
+    return f"https://youtu.be/{video_id}"
+
+
+def append_attribution(text: str, video_id: str, max_len: int | None = None) -> str:
+    """Return `text` with a single `Original video: https://youtu.be/<id>` line
+    appended. This is the ONE place attribution is formatted — every platform's
+    description path calls it, so the line (and its URL cleanup) can't drift.
+
+    - The URL is always the clean short form, ID only — any query params or
+      fragments on the original queue URL never reach here (we take the ID).
+    - Idempotent: any existing attribution line is stripped first, so editing a
+      caption over Telegram (or a caption that already contains one) never
+      duplicates it.
+    - `max_len` (optional) caps the whole result, truncating the body — never
+      the attribution line — so the attribution always survives.
+    """
+    body = "\n".join(
+        ln for ln in text.split("\n") if not ln.strip().startswith(ATTRIBUTION_PREFIX)
+    ).rstrip()
+
+    if not video_id:
+        return body[:max_len] if max_len is not None else body
+
+    line = f"{ATTRIBUTION_PREFIX} {source_url(video_id)}"
+    if max_len is not None:
+        room = max_len - len(line) - 1  # 1 for the joining newline
+        body = body[:room].rstrip() if room > 0 else ""
+    return f"{body}\n{line}" if body else line
 
 
 def generate_all(

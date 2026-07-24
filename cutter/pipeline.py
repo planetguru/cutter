@@ -209,6 +209,10 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
             # APPROVED — fall through to posting
 
         # --- Post ---
+        # Stamp the canonical source video ID so every platform's description
+        # gets the "Original video:" attribution (see captioner.append_attribution).
+        if cap is not None:
+            cap.video_id = asset.video_id
         clip_result = ClipResult(clip_path=clip_path, caption=cap)
 
         if "tiktok" in platforms:

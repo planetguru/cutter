@@ -47,6 +47,7 @@ def approve_clip(
         instagram_caption=caption.instagram_caption,
         youtube_caption=caption.youtube_caption,
         hashtags=list(caption.hashtags),
+        video_id=caption.video_id,
     )
 
     for reprompt in range(MAX_REPROMPTS):

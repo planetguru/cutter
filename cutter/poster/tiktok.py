@@ -35,7 +35,13 @@ class TikTokError(Exception):
 def build_caption(caption: Caption | None, clip_path: Path) -> str:
     title = caption.tiktok_caption[:150] if caption else clip_path.stem
     hashtags = caption.hashtag_string if caption else ""
-    return f"{title}\n\n{hashtags}".strip()[:2200]
+    text = f"{title}\n\n{hashtags}".strip()
+    if caption is None:
+        return text[:2200]
+    # Append attribution to the assembled text (not the caption field) so the
+    # title[:150] truncation above can never clip it.
+    from ..captioner import append_attribution
+    return append_attribution(text, caption.video_id, max_len=2200)
 
 
 class TikTokPoster:

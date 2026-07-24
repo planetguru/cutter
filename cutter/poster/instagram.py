@@ -52,7 +52,9 @@ class InstagramPoster:
     def post(self, clip_path: Path, caption: Caption | None) -> PostResult:
         text = ""
         if caption:
-            text = f"{caption.instagram_caption}\n\n{caption.hashtag_string}".strip()[:2200]
+            from ..captioner import append_attribution
+            text = f"{caption.instagram_caption}\n\n{caption.hashtag_string}".strip()
+            text = append_attribution(text, caption.video_id, max_len=2200)
 
         remote_name = None
         try:
