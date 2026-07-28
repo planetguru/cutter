@@ -101,7 +101,7 @@ class TikTokPoster:
         else:
             # Inbox upload: the clip lands as a draft in the user's TikTok inbox
             # and is published manually in-app. Captions can't be attached here,
-            # so the pipeline sends the caption via WhatsApp instead.
+            # so the pipeline sends the caption via Telegram instead.
             init_url = f"{API_BASE}/post/publish/inbox/video/init/"
             payload = {"source_info": source_info}
 

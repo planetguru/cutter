@@ -157,14 +157,14 @@
 
       <section>
         <h2>Platform connections</h2>
-        <p>Cutter connects to TikTok and Instagram on behalf of the operator using OAuth tokens tied to the operator's own accounts. These tokens are stored locally on the operator's machine. No account credentials or tokens are shared with, or accessible to, any third party.</p>
-        <p>Content posted through this tool is published to the operator's own TikTok and Instagram accounts. The handling of that content once published is governed by each platform's own privacy policy.</p>
+        <p>Cutter connects to Instagram and YouTube on behalf of the operator using OAuth tokens tied to the operator's own accounts (TikTok clips are posted manually by the operator). These tokens are stored locally on the machine that runs the tool. No account credentials or tokens are shared with, or accessible to, any third party.</p>
+        <p>Content posted through this tool is published to the operator's own Instagram and YouTube accounts. The handling of that content once published is governed by each platform's own privacy policy.</p>
       </section>
 
       <section>
         <h2>Data storage</h2>
         <p>All data processed by this tool — including downloaded video files, generated captions, and OAuth tokens — is stored locally on the operator's machine. Nothing is persisted to a remote database or shared storage.</p>
-        <p>Video clips are temporarily hosted at a location defined by the operator for preview purposes during the approval step, and are deleted automatically once a decision is made. They are not indexed, shared, or retained beyond that point.</p>
+        <p>To publish an Instagram Reel, a clip is briefly copied to a web location defined by the operator (Instagram's API ingests the video from a URL) and is deleted automatically once publishing completes. It is not indexed, shared, or retained beyond that point.</p>
       </section>
 
       <section>
@@ -172,9 +172,8 @@
         <p>This tool makes use of the following external services, each governed by their own privacy policies:</p>
         <p><strong>YouTube / Google</strong> — source video and metadata. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>.</p>
         <p><strong>Anthropic</strong> — caption generation via Claude Haiku. <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic Privacy Policy</a>.</p>
-        <p><strong>Twilio</strong> — WhatsApp message delivery for approval notifications. <a href="https://www.twilio.com/en-us/legal/privacy" target="_blank" rel="noopener">Twilio Privacy Policy</a>.</p>
-        <p><strong>TikTok</strong> — video publishing via the Content Posting API. <a href="https://www.tiktok.com/legal/page/global/privacy-policy" target="_blank" rel="noopener">TikTok Privacy Policy</a>.</p>
-        <p><strong>Meta / Instagram</strong> — video publishing via the Graph API. <a href="https://privacycenter.instagram.com/policy" target="_blank" rel="noopener">Instagram Privacy Policy</a>.</p>
+        <p><strong>Telegram</strong> — the approval conversation (clip previews and yes/no replies) runs over a Telegram bot. <a href="https://telegram.org/privacy" target="_blank" rel="noopener">Telegram Privacy Policy</a>.</p>
+        <p><strong>Meta / Instagram</strong> — video publishing via the Instagram Graph API. <a href="https://privacycenter.instagram.com/policy" target="_blank" rel="noopener">Instagram Privacy Policy</a>.</p>
       </section>
 
       <section>

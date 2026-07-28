@@ -36,8 +36,7 @@ def _load() -> QueueFile:
     try:
         raw = json.loads(QUEUE_PATH.read_text())
         items = [QueueItem(**i) for i in raw.get("items", [])]
-        scan = raw.get("last_message_scan") or raw.get("last_whatsapp_scan")  # legacy key
-        return QueueFile(items=items, last_message_scan=scan)
+        return QueueFile(items=items, last_message_scan=raw.get("last_message_scan"))
     except Exception:
         return QueueFile()
 

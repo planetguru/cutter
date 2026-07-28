@@ -1,5 +1,15 @@
 # Facebook Reels Setup
 
+> ⚠️ **NOT OPERATIONAL — scaffolded only (as of July 2026).** This integration
+> was attempted but never completed. Publicly posting to a Page requires the
+> `pages_manage_posts` permission at **Advanced Access**, which needs Meta **App
+> Review + business verification** — not done. Without it, the app only offers
+> Instagram-flavour permissions and cannot post to a Page. The code
+> (`poster/facebook.py`, `cutter auth facebook`) remains in the repo in case
+> that changes, but **cutter does not post to Facebook**. Everything below is
+> the intended setup, kept for reference — it will not work end-to-end until
+> the review/verification is completed.
+
 cutter posts Reels to a **Facebook Page** via the Graph API. Unlike the
 Instagram integration (which is Page-free), Facebook Reels require a Facebook
 Page and a Page access token — obtained once with Facebook Login. Page tokens
