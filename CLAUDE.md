@@ -75,12 +75,17 @@ YouTube URL
 
 ### Telegram Approval Flow
 
-When `--approve` is passed, `pipeline.py` calls `approver.approve_clip()` for each clip before posting. The approver sends the clip video + a prompt via `telegram.TelegramClient` (Bot API long-polling — no webhook/server needed) and loops on replies:
+When `--approve` is passed, `pipeline.py` calls `approver.approve_clip()` for each clip before posting. The approver sends the clip video + a prompt via `telegram.TelegramClient` (Bot API long-polling — no webhook/server needed) and loops on replies. `approve_clip` returns a `Decision`:
 
-- **yes** → approved, fall through to posting
-- **no** → `state.StateStore.withhold_clip()` moves the file to `{video_id}/withheld/`, updates `approval_state.json`
-- **no more today** → `AppState.pause_until_tomorrow()` sets a date in `approval_state.json`; next run checks this and resumes if it's a new day
-- **title/desc/tiktok/instagram/tags: ...** → mutates the in-memory `Caption` object and re-prompts
+- **yes** → `APPROVED` — post this clip; `daily` stops (its one post for today).
+- **no** → the bot asks "*next* or *pause*?" and keeps waiting (returns no decision yet).
+  - **next** → `SKIP_NEXT` — `withhold_clip()` (moves the file to `{video_id}/withheld/`) and offer the next candidate. When a video's clips are exhausted this way, `cutter daily` advances to the **next queued video** (see below).
+  - **pause** → `SKIP_PAUSE` — withhold this clip, then `pause_until_tomorrow()`.
+- **no more today** → `HOLD_PAUSE` — keep the current clip pending (not withheld) and pause; tomorrow resumes from it.
+- timeout (no reply) → `TIMEOUT` — keep the clip pending, stop.
+- **title/desc/tiktok/instagram/youtube/tags: ...** → mutates the in-memory `Caption` object and re-prompts.
+
+`pipeline.run()` returns `(results, RunOutcome)` where `RunOutcome ∈ {POSTED, PAUSED, TIMEOUT, EXHAUSTED, NOTHING}`. `cutter daily` loops over queued videos: it keeps offering until a clip is **posted** or the user **pauses**, crossing to the next video on `EXHAUSTED` (all clips skipped via *next*). `--max-clips` caps clips *posted* per run, not offered.
 - timeout → re-prompts up to 3 times, then withholds
 
 ### Persistent State

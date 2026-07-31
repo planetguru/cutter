@@ -13,10 +13,11 @@ from .telegram import TelegramClient
 
 
 class Decision(Enum):
-    APPROVED = auto()
-    WITHHELD = auto()
-    NO_MORE_TODAY = auto()
-    TIMEOUT = auto()
+    APPROVED = auto()      # yes — post this clip
+    SKIP_NEXT = auto()     # no → next — withhold this clip, offer the next candidate
+    SKIP_PAUSE = auto()    # no → pause — withhold this clip, then pause until tomorrow
+    HOLD_PAUSE = auto()    # "no more today" — keep this clip pending, pause until tomorrow
+    TIMEOUT = auto()       # no response — keep this clip pending, stop
 
 
 @dataclass
@@ -72,7 +73,7 @@ def approve_clip(
             sent_at = _dt.datetime.now(_dt.timezone.utc)
 
         if reprompt < MAX_REPROMPTS - 1:
-            wa.send(f"⏰ Still waiting on clip {clip_index}/{total_clips}. Reply yes / no / no more today.")
+            wa.send(f"⏰ Still waiting on clip {clip_index}/{total_clips}. Reply *yes* to post or *no* to skip.")
 
     # Exhausted reprompts
     wa.send(f"⚠️ No response after {MAX_REPROMPTS} prompts. Skipping clip {clip_index}/{total_clips} for now.")
@@ -93,20 +94,34 @@ def _handle_reply(
     """
     lower = reply.lower().strip()
 
-    # --- Stop for today ---
+    # --- "no more today" — stop, keep the current clip for tomorrow ---
     if re.search(r"\bno more today\b", lower):
-        wa.send("⏸ Got it — stopping for today. I'll offer the remaining clips next time you run.")
-        return ApprovalResult(decision=Decision.NO_MORE_TODAY, caption=current)
+        wa.send("⏸ Got it — stopping for today. I'll pick up from this clip next time.")
+        return ApprovalResult(decision=Decision.HOLD_PAUSE, caption=current)
 
     # --- Approve ---
     if lower in ("yes", "y", "approve", "ok", "yep", "yeah", "post it", "go"):
         wa.send(f"✅ Approved! Posting clip {clip_index}/{total_clips}…")
         return ApprovalResult(decision=Decision.APPROVED, caption=current)
 
-    # --- Withhold ---
+    # --- Reject → ask whether to try the next clip or pause for the day ---
     if lower in ("no", "n", "skip", "nope", "reject", "pass"):
-        wa.send(f"🗂 Skipped. Moving clip {clip_index}/{total_clips} to withheld.")
-        return ApprovalResult(decision=Decision.WITHHELD, caption=current)
+        wa.send(
+            f"🗂 Skipped clip {clip_index}/{total_clips}. "
+            "Reply *next* to see another, or *pause* to stop until tomorrow "
+            "(or *yes* to post this one after all)."
+        )
+        return None  # keep the conversation open, waiting for next / pause
+
+    # --- next: withhold the current clip and offer the next candidate ---
+    if lower in ("next", "another", "n2"):
+        wa.send("👍 On to the next one…")
+        return ApprovalResult(decision=Decision.SKIP_NEXT, caption=current)
+
+    # --- pause: withhold the current clip and stop until tomorrow ---
+    if lower in ("pause", "stop", "later", "tomorrow"):
+        wa.send("⏸ Paused — I'll offer the next clip on tomorrow's run.")
+        return ApprovalResult(decision=Decision.SKIP_PAUSE, caption=current)
 
     # --- Edit title ---
     m = re.match(r"(?:title|t)\s*[:\-]\s*(.+)", reply, re.IGNORECASE)
@@ -156,9 +171,10 @@ def _handle_reply(
     # --- Unrecognised ---
     wa.send(
         "🤔 Didn't understand that. Reply:\n"
-        "  *yes* — post\n"
-        "  *no* — skip\n"
-        "  *no more today* — stop for today\n"
+        "  *yes* — post this clip\n"
+        "  *no* — skip it (I'll then ask *next* or *pause*)\n"
+        "  *next* — skip and see the next clip\n"
+        "  *pause* — skip and stop until tomorrow\n"
         "  *title: ...*\n"
         "  *desc: ...* (all platforms)\n"
         "  *tiktok: ...*\n"

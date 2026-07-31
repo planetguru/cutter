@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 
 import platformdirs
@@ -17,6 +18,15 @@ from .state import StateStore
 from .telegram import TelegramClient
 
 console = Console()
+
+
+class RunOutcome(str, Enum):
+    """How a `run()` ended — drives whether `cutter daily` moves to the next video."""
+    POSTED = "posted"        # a clip was posted (daily's job for today is done)
+    PAUSED = "paused"        # user paused until tomorrow
+    TIMEOUT = "timeout"      # no response — stopped, current clip held for next run
+    EXHAUSTED = "exhausted"  # user skipped every clip of this video via 'next' → try next video
+    NOTHING = "nothing"      # nothing to offer (empty / already paused / non-approval no-op)
 
 
 @dataclass
@@ -74,7 +84,7 @@ def _manual_tiktok_handoff(
     return PostResult(platform="tiktok", clip_path=clip_path)
 
 
-def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
+def run(url: str, options: PipelineOptions | None = None) -> tuple[list[ClipResult], RunOutcome]:
     if options is None:
         options = PipelineOptions()
 
@@ -154,8 +164,8 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
 
     # Check daily pause
     if app_state.is_paused_today():
-        console.print("[yellow]Paused for today (you said 'no more today' last time). Run again tomorrow.[/yellow]")
-        return []
+        console.print("[yellow]Paused for today (you paused last time). Run again tomorrow.[/yellow]")
+        return [], RunOutcome.PAUSED
 
     # Seed the pending queue if this is a fresh run for this video
     clip_names = [c.name for c in final_clips]
@@ -176,6 +186,7 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
     results: list[ClipResult] = []
     total = len(pending_clips)
     posted = 0
+    outcome = RunOutcome.NOTHING
 
     for i, clip_path in enumerate(pending_clips, 1):
         cap = captions_list[clip_names.index(clip_path.name)] if clip_path.name in clip_names else None
@@ -185,25 +196,36 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
             result = approve_clip(wa, clip_path, cap, i, total)
             cap = result.caption  # may have been edited
 
-            if result.decision == Decision.WITHHELD:
-                # "no" — this clip's a dud; withhold it and offer the next one.
+            if result.decision == Decision.SKIP_NEXT:
+                # "no → next" — withhold this dud and offer the next candidate.
                 store.withhold_clip(asset.video_id, clip_path.name, reframed_dir)
                 results.append(ClipResult(clip_path=clip_path, caption=cap, withheld=True))
                 continue
 
-            if result.decision == Decision.NO_MORE_TODAY:
-                # Hold the current candidate (leave it pending) and stop for
-                # today; tomorrow's run resumes from it.
+            if result.decision == Decision.SKIP_PAUSE:
+                # "no → pause" — withhold this dud, then pause until tomorrow.
+                store.withhold_clip(asset.video_id, clip_path.name, reframed_dir)
+                results.append(ClipResult(clip_path=clip_path, caption=cap, withheld=True))
+                app_state.pause_until_tomorrow()
+                store.save()
+                outcome = RunOutcome.PAUSED
+                break
+
+            if result.decision == Decision.HOLD_PAUSE:
+                # "no more today" — keep the current clip pending and pause;
+                # tomorrow's run resumes from it.
                 app_state.pause_until_tomorrow()
                 store.save()
                 for remaining in pending_clips[i - 1:]:
                     results.append(ClipResult(clip_path=remaining, caption=None, skipped_today=True))
+                outcome = RunOutcome.PAUSED
                 break
 
             if result.decision == Decision.TIMEOUT:
-                # No response — hold this clip (leave it pending) and stop for today.
+                # No response — keep this clip pending and stop for today.
                 for remaining in pending_clips[i - 1:]:
                     results.append(ClipResult(clip_path=remaining, caption=None, skipped_today=True))
+                outcome = RunOutcome.TIMEOUT
                 break
 
             # APPROVED — fall through to posting
@@ -271,11 +293,21 @@ def run(url: str, options: PipelineOptions | None = None) -> list[ClipResult]:
         # reach here, so we keep offering candidates until one is approved.
         posted += 1
         if options.max_clips is not None and posted >= options.max_clips:
+            outcome = RunOutcome.POSTED
             break
+
+    # If the loop finished without an explicit break: classify the outcome so
+    # `cutter daily` knows whether to move on to the next queued video.
+    if outcome == RunOutcome.NOTHING:
+        if posted > 0:
+            outcome = RunOutcome.POSTED
+        elif pending_clips:
+            # Every clip was skipped via "next" — this video is exhausted.
+            outcome = RunOutcome.EXHAUSTED
 
     # Clean up raw clips
     if not options.keep_raw:
         for raw in raw_clips:
             raw.unlink(missing_ok=True)
 
-    return results
+    return results, outcome

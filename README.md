@@ -19,7 +19,7 @@ YouTube URL
 
 1. Add YouTube URLs to a queue (CLI or a Telegram message).
 2. A daily cron job (9am) processes the next pending clip and sends it to you on Telegram — the video plus generated captions.
-3. You reply **yes** to post, **no** to skip, **no more today** to pause, or edit the captions first.
+3. You reply **yes** to post, **no** to skip (it then offers the next clip, or **pause** until tomorrow), or edit the captions first.
 4. Approved clips post to your configured platforms. Each video's clips go out one per day, in order.
 
 ## Architecture / where it runs
@@ -119,15 +119,17 @@ For each clip you get the video plus a prompt showing the TikTok, Instagram, and
 
 | Reply | Effect |
 |---|---|
-| `yes` | Post the clip |
-| `no` | Skip (moved to the withheld folder) |
-| `no more today` | Stop for the day; resume tomorrow |
+| `yes` | Post the clip (that's the post for today) |
+| `no` | Skip it — the bot then asks whether to try the next clip or pause |
+| `next` | (after `no`) skip this clip and see the next candidate — crossing into the next queued video if the current one runs out |
+| `pause` | (after `no`) skip this clip and stop until tomorrow |
+| `no more today` | Stop for the day, keeping the current clip for tomorrow |
 | `title: ...` | Set the title (used for YouTube + shown in the prompt) |
 | `desc: ...` | Set **all** platform captions at once |
 | `tiktok: ...` / `instagram: ...` / `youtube: ...` | Set one platform's caption |
 | `tags: #a #b #c` | Replace the hashtags |
 
-Edits re-show the prompt for confirmation. Each platform's caption is independent — editing the TikTok caption no longer affects YouTube.
+So a `no` never ends your day by itself: you keep getting fresh candidates (across videos) until you `yes` one or `pause`. Edits re-show the prompt for confirmation; each platform's caption is independent.
 
 ## Data, state, and logs
 

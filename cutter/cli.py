@@ -136,7 +136,7 @@ def run_cmd(
     )
 
     try:
-        results = run(url, options)
+        results, _ = run(url, options)
     except ConfigError as e:
         console.print(f"[red]Config error:[/red] {e}")
         raise SystemExit(1)
@@ -647,46 +647,76 @@ def daily(post: str, approve: bool, max_clips: int) -> None:
     except Exception:
         pass
 
-    item = q.next_pending_item()
-    if item is None:
-        console.print("[dim]Queue is empty — nothing to post today.[/dim]")
-        return
-    url = item.url
+    from .pipeline import RunOutcome
 
-    console.print(f"Processing: {url} (reframe: {item.reframe})")
-
-    options = PipelineOptions(
-        post=post,
-        approve=approve,
-        reframe=item.reframe,
-        workdir=workdir,
-        max_clips=None if max_clips == 0 else max_clips,
-    )
-
+    # Best-effort messenger for cross-video / end-of-queue notes.
+    notify = None
     try:
-        results = run(url, options)
-    except ConfigError as e:
-        console.print(f"[red]Config error:[/red] {e}")
-        raise SystemExit(1)
-    except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise SystemExit(1)
+        from .telegram import TelegramClient as _TG
+        notify = _TG(settings)
+    except Exception:
+        notify = None
 
-    # Mark URL as used once all its clips are processed.
-    # Leave as pending if the user said "no more today" (clips remain in pending state).
-    has_skipped = any(r.skipped_today for r in results)
-    if not has_skipped:
-        # Confirm no pending clips remain for this video (guards against the
-        # "paused today from a previous run" case which returns an empty result list).
+    def _mark_used_if_done(url: str) -> None:
+        """Mark the queue URL used once its approval-state pending list is empty."""
         m = re.search(r'(?:v=|youtu\.be/|embed/|shorts/)([a-zA-Z0-9_-]{11})', url)
-        video_id = m.group(1) if m else None
-        if video_id:
-            store = StateStore(workdir)
-            vs = store.state.videos.get(video_id)
-            still_pending = vs.pending if vs else []
-        else:
-            still_pending = []
-
-        if not still_pending:
+        vid = m.group(1) if m else None
+        vs = StateStore(workdir).state.videos.get(vid) if vid else None
+        if not (vs.pending if vs else []):
             q.mark_used(url)
             console.print(f"[dim]Marked as used: {url}[/dim]")
+
+    # Offer clips until one is posted, the user pauses, or the queue runs dry.
+    # A "no → next" that exhausts one video's clips advances to the next video.
+    first = True
+    seen: set[str] = set()
+    while True:
+        item = q.next_pending_item()
+        if item is None:
+            console.print("[dim]Queue is empty — nothing to offer.[/dim]")
+            if not first and notify:
+                try:
+                    notify.send("That's the whole queue — nothing more to offer today.")
+                except Exception:
+                    pass
+            break
+
+        url = item.url
+        if not first and notify:
+            try:
+                notify.send("👍 Fetching the next video — one moment while I prepare its clips…")
+            except Exception:
+                pass
+        console.print(f"Processing: {url} (reframe: {item.reframe})")
+
+        options = PipelineOptions(
+            post=post, approve=approve, reframe=item.reframe,
+            workdir=workdir, max_clips=None if max_clips == 0 else max_clips,
+        )
+
+        try:
+            results, outcome = run(url, options)
+        except ConfigError as e:
+            console.print(f"[red]Config error:[/red] {e}")
+            raise SystemExit(1)
+        except Exception as e:
+            # e.g. the next video isn't downloaded on the server yet.
+            console.print(f"[red]Error processing {url}:[/red] {e}")
+            if not first and notify:
+                try:
+                    notify.send("Couldn't prepare the next video (it may not be downloaded yet). "
+                                "I'll try again on the next run.")
+                except Exception:
+                    pass
+            break
+
+        _mark_used_if_done(url)
+        first = False
+
+        # EXHAUSTED (skipped every clip) or NOTHING (no offerable clips) → try the
+        # next video; POSTED / PAUSED / TIMEOUT → done for now. The `seen` guard
+        # ensures we never revisit a URL, so this can't loop forever.
+        if outcome in (RunOutcome.EXHAUSTED, RunOutcome.NOTHING) and url not in seen:
+            seen.add(url)
+            continue
+        break
