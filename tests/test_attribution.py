@@ -82,6 +82,27 @@ def test_build_caption_without_caption_has_no_attribution():
     assert "Original video:" not in out
 
 
+def test_youtube_description_includes_chosen_hashtags():
+    from cutter.poster.youtube import _youtube_description
+    cap = Caption(tiktok_caption="tt", instagram_caption="ig", youtube_caption="A body.",
+                  hashtags=["eurorack", "modular"], video_id=VID)
+    desc = _youtube_description(cap)
+    # The user's hashtags must be IN the description text (not just the tags field),
+    # plus #Shorts, plus the attribution line.
+    assert "#eurorack" in desc and "#modular" in desc
+    assert "#Shorts" in desc
+    assert desc.endswith(LINE)
+
+
+def test_youtube_description_caps_hashtags_at_15():
+    from cutter.poster.youtube import _youtube_description
+    cap = Caption(tiktok_caption="tt", instagram_caption="ig", youtube_caption="body",
+                  hashtags=[f"tag{i}" for i in range(30)], video_id=VID)
+    desc = _youtube_description(cap)
+    # YouTube ignores all description hashtags if there are >15.
+    assert desc.count("#") <= 15
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for fn in fns:

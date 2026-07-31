@@ -86,6 +86,27 @@ def _youtube_title(caption: Caption | None, clip_path: Path) -> str:
     return cut or base[:100]
 
 
+def _youtube_description(caption: Caption | None) -> str:
+    """Build the YouTube Shorts description.
+
+    Hashtags must appear in the DESCRIPTION text to show as clickable tags above
+    the title — YouTube's `snippet.tags` field is invisible search metadata only.
+    YouTube ignores ALL description hashtags if there are more than 15, so the
+    user's tags are capped at 14 with one reserved for #Shorts. The
+    `Original video:` attribution line is appended last.
+    """
+    body = ""
+    if caption:
+        body = (caption.youtube_caption or caption.tiktok_caption).strip()
+    user_tags = (caption.hashtags if caption else [])[:14]
+    tag_line = " ".join([f"#{t.lstrip('#')}" for t in user_tags] + ["#Shorts"])
+    description = "\n\n".join(p for p in (body, tag_line) if p)
+    if caption:
+        from ..captioner import append_attribution
+        description = append_attribution(description, caption.video_id, max_len=4900)
+    return description
+
+
 class YouTubePoster:
     def __init__(self, settings: Settings) -> None:
         settings.require_youtube()
@@ -94,14 +115,8 @@ class YouTubePoster:
 
     def post(self, clip_path: Path, caption: Caption | None) -> PostResult:
         title = _youtube_title(caption, clip_path)
-        # Prefer the dedicated YouTube description; fall back to the TikTok caption.
-        body = ""
-        if caption:
-            body = (caption.youtube_caption or caption.tiktok_caption).strip()
-        description = (body + "\n\n#Shorts").strip()
-        if caption:
-            from ..captioner import append_attribution
-            description = append_attribution(description, caption.video_id, max_len=4900)
+        description = _youtube_description(caption)
+        # Invisible keyword metadata (helps search; not displayed on the page).
         tags = (caption.hashtags if caption else []) + ["Shorts"]
 
         try:
